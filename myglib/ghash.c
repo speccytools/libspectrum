@@ -32,7 +32,7 @@
 
 #include <config.h>
 
-#ifndef HAVE_LIB_GLIB		/* Use this iff we're not using the 
+#ifndef HAVE_LIB_GLIB		/* Use this iff we're not using the
 				   `proper' glib */
 #include <string.h>
 
@@ -61,6 +61,20 @@ struct _GHashTable
 
 static GHashNode *node_free_list = NULL;
 static GHashNode *node_allocated_list = NULL;
+
+#ifdef HAVE_STDATOMIC_H
+
+static atomic_char atomic_locker = ATOMIC_VAR_INIT(0);
+
+#define lock() atomic_lock( &atomic_locker )
+#define unlock() atomic_unlock( &atomic_locker )
+
+#else				/* #ifdef HAVE_STDATOMIC_H */
+
+#define lock()
+#define unlock()
+
+#endif				/* #ifdef HAVE_STDATOMIC_H */
 
 static guint
 g_direct_hash (gconstpointer v)
@@ -122,8 +136,10 @@ g_hash_nodes_destroy (GHashNode *hash_node,
       if (value_destroy_func)
         value_destroy_func (node->value);
 
+      lock();
       node->next = node_free_list;
       node_free_list = hash_node;
+      unlock();
     }
 }
 
@@ -181,6 +197,7 @@ g_hash_node_new (gpointer key,
   GHashNode *hash_node;
   guint i;
 
+  lock();
   if (!node_free_list)
     {
       node_free_list = libspectrum_malloc (1024 * sizeof (GHashNode));
@@ -194,7 +211,8 @@ g_hash_node_new (gpointer key,
   
   hash_node = node_free_list;
   node_free_list = node_free_list->next;
-  
+  unlock();
+
   hash_node->key = key;
   hash_node->value = value;
   hash_node->next = NULL;
@@ -239,8 +257,10 @@ g_hash_node_destroy (GHashNode *hash_node,
   if (value_destroy_func)
     value_destroy_func (hash_node->value);
 
+  lock();
   hash_node->next = node_free_list;
   node_free_list = hash_node;
+  unlock();
 }
 
 guint
@@ -348,8 +368,10 @@ g_str_equal (gconstpointer v1,
 void
 libspectrum_hashtable_cleanup( void )
 {
+  lock();
   libspectrum_free( node_allocated_list );
   node_allocated_list = NULL;
   node_free_list = NULL;
+  unlock();
 }
 #endif				/* #ifndef HAVE_LIB_GLIB */

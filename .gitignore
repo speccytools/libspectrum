@@ -1,3 +1,4 @@
+*~
 /aclocal.m4
 /autom4te.cache
 /compile
@@ -9,6 +10,7 @@
 /config.status
 /config.sub
 /configure
+.DS_Store
 /depcomp
 .deps
 .dirstamp

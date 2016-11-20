@@ -24,6 +24,10 @@ libspectrum_la_SOURCES += \
 	myglib/garray.c \
 	myglib/ghash.c \
 	myglib/gslist.c
+if HAVE_LOCK
+libspectrum_la_SOURCES += \
+	myglib/glock.c
+endif
 endif
 
 EXTRA_DIST += myglib/Makefile.am
