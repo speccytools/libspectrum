@@ -570,7 +570,7 @@ libspectrum_identify_file_raw( libspectrum_id_t *type, const char *filename,
 
       { LIBSPECTRUM_ID_AUX_POK,       "pok", 3, NULL,		    0, 0, 0 },
 
-      { LIBSPECTRUM_ID_SCREEN_SCR,    "scr", 3, NULL,               0, 0, 0 },
+      { LIBSPECTRUM_ID_SCREEN_SCR,    "scr", 3, NULL,		    0, 0, 0 },
 
       { -1, NULL, 0, NULL, 0, 0, 0 }, /* End marker */
 

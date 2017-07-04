@@ -26,6 +26,7 @@ ACLOCAL_AMFLAGS = -I m4
 lib_LTLIBRARIES = libspectrum.la
 
 libspectrum_la_SOURCES = bzip2.c \
+			 buffer.c \
 			 creator.c \
 			 crypto.c \
 			 csw.c \
@@ -74,7 +75,7 @@ endif
 ## * Always increase the revision value.
 ## * Increase the age value only if the changes made to the ABI are backward
 ##   compatible.
-libspectrum_la_LDFLAGS = -version-info 13:7:5 -no-undefined @WINDRES_LDFLAGS@
+libspectrum_la_LDFLAGS = -version-info 14:8:6 -no-undefined @WINDRES_LDFLAGS@
 
 libspectrum_la_LIBADD = @AUDIOFILE_LIBS@ @GLIB_LIBS@ -lm
 
@@ -116,6 +117,7 @@ windres.o: windres.rc
 AM_CPPFLAGS = @GLIB_CFLAGS@ @AUDIOFILE_CFLAGS@
 
 EXTRA_DIST = accessor.pl \
+	     buffer_license.txt \
 	     dll.c \
 	     generate.pl.in \
 	     m4/audiofile.m4 \
