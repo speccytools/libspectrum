@@ -251,6 +251,10 @@ typedef enum libspectrum_id_t {
 
   LIBSPECTRUM_ID_SCREEN_SCR,		/* .scr screen file */
 
+  /* Below here, present only in 1.3.6 and later */
+
+  LIBSPECTRUM_ID_SCREEN_MLT,		/* .mlt screen file */
+
 } libspectrum_id_t;
 
 /* And 'classes' of file */
@@ -1085,6 +1089,37 @@ WIN32_DLL void
 libspectrum_ide_write( libspectrum_ide_channel *chn,
 		       libspectrum_ide_register reg,
 		       libspectrum_byte data );
+
+/* MMC handling routines */
+
+typedef struct libspectrum_mmc_card libspectrum_mmc_card;
+
+WIN32_DLL libspectrum_mmc_card*
+libspectrum_mmc_alloc( void );
+
+WIN32_DLL void
+libspectrum_mmc_free( libspectrum_mmc_card *card );
+
+WIN32_DLL libspectrum_error
+libspectrum_mmc_insert( libspectrum_mmc_card *card, const char *filename );
+
+WIN32_DLL void
+libspectrum_mmc_eject( libspectrum_mmc_card *card );
+
+WIN32_DLL void
+libspectrum_mmc_reset( libspectrum_mmc_card *card );
+
+WIN32_DLL int
+libspectrum_mmc_dirty( libspectrum_mmc_card *card );
+
+WIN32_DLL void
+libspectrum_mmc_commit( libspectrum_mmc_card *card );
+
+WIN32_DLL libspectrum_byte
+libspectrum_mmc_read( libspectrum_mmc_card *card );
+
+WIN32_DLL void
+libspectrum_mmc_write( libspectrum_mmc_card *card, libspectrum_byte data );
 
 #ifdef __cplusplus
 };

@@ -161,6 +161,7 @@ int libspectrum_split_to_48k_pages( libspectrum_snap *snap,
 #define SNAPSHOT_DOCK_EXROM_PAGES 8
 #define SNAPSHOT_JOYSTICKS 7
 #define SNAPSHOT_DIVIDE_PAGES 4
+#define SNAPSHOT_DIVMMC_PAGES 64
 
 /* Get memory for a snap */
 
@@ -277,6 +278,63 @@ libspectrum_error
 libspectrum_tape_get_next_edge_internal( libspectrum_dword *tstates, int *flags,
                                          libspectrum_tape *tape,
                                          libspectrum_tape_block_state *it );
+/* Disk routines */
+
+typedef struct libspectrum_hdf_header {
+
+  libspectrum_byte signature[0x06];
+  libspectrum_byte id;
+  libspectrum_byte revision;
+  libspectrum_byte flags;
+  libspectrum_byte datastart_low;
+  libspectrum_byte datastart_hi;
+  libspectrum_byte reserved[0x0b];
+  libspectrum_byte drive_identity[0x6a];
+
+} libspectrum_hdf_header;
+  
+typedef struct libspectrum_ide_drive {
+
+  /* HDF filepointer and information */
+  FILE *disk;
+  libspectrum_word data_offset;
+  libspectrum_word sector_size;
+  libspectrum_hdf_header hdf;
+  
+  /* Drive geometry */
+  int cylinders;
+  int heads;
+  int sectors;
+
+  libspectrum_byte error;
+  libspectrum_byte status;
+  
+} libspectrum_ide_drive;
+
+libspectrum_error
+libspectrum_ide_insert_into_drive( libspectrum_ide_drive *drv,
+                                   const char *filename );
+
+libspectrum_error
+libspectrum_ide_eject_from_drive( libspectrum_ide_drive *drv,
+                                  GHashTable *cache );
+
+int
+libspectrum_ide_read_sector_from_hdf(
+    libspectrum_ide_drive *drv,
+    GHashTable *cache,
+    libspectrum_dword sector_number,
+    libspectrum_byte *dest );
+
+void
+libspectrum_ide_write_sector_to_hdf(
+    libspectrum_ide_drive *drv,
+    GHashTable *cache,
+    libspectrum_dword sector_number,
+    libspectrum_byte *src );
+
+void
+libspectrum_ide_commit_drive( libspectrum_ide_drive *drv, GHashTable *cache );
 
 /* Crypto functions */
 

@@ -35,6 +35,7 @@ libspectrum_la_SOURCES = bzip2.c \
 			 libspectrum.c \
                          memory.c \
 			 microdrive.c \
+			 mmc.c \
 			 plusd.c \
 			 pzx_read.c \
 			 rzx.c \
@@ -75,7 +76,7 @@ endif
 ## * Always increase the revision value.
 ## * Increase the age value only if the changes made to the ABI are backward
 ##   compatible.
-libspectrum_la_LDFLAGS = -version-info 14:9:6 -no-undefined @WINDRES_LDFLAGS@
+libspectrum_la_LDFLAGS = -version-info 15:10:7 -no-undefined @WINDRES_LDFLAGS@
 
 libspectrum_la_LIBADD = @AUDIOFILE_LIBS@ @GLIB_LIBS@ -lm
 
