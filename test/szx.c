@@ -97,9 +97,9 @@ find_szx_chunk( libspectrum_buffer *buffer, const char *search )
 }
 
 static test_return_t
-szx_write_block_test( const char *id, libspectrum_machine machine,
-    void (*setter)( libspectrum_snap* ),
-    libspectrum_byte *expected, size_t expected_length )
+szx_write_block_test_with_flags( const char *id, libspectrum_machine machine,
+    int flags, void (*setter)( libspectrum_snap* ),
+    libspectrum_byte *expected, size_t expected_length, size_t total_length )
 {
   libspectrum_snap *snap;
   libspectrum_buffer *buffer;
@@ -115,7 +115,7 @@ szx_write_block_test( const char *id, libspectrum_machine machine,
 
   setter( snap );
 
-  libspectrum_szx_write( buffer, &out_flags, snap, NULL, 0 );
+  libspectrum_szx_write( buffer, &out_flags, snap, NULL, flags );
   libspectrum_snap_free( snap );
 
   chunk = find_szx_chunk( buffer, id );
@@ -126,12 +126,18 @@ szx_write_block_test( const char *id, libspectrum_machine machine,
 
   libspectrum_buffer_free( buffer );
 
-  if( chunk->length == expected_length ) {
+  if( chunk->length == total_length ) {
     if( memcmp( chunk->data, expected, expected_length ) ) {
-      fprintf( stderr, "Chunk has wrong data\n" );
+      fprintf( stderr, "Chunk has wrong initial data\n" );
       r = TEST_FAIL;
     } else {
       r = TEST_PASS;
+      for( size_t i = expected_length; i < total_length; i++ ) {
+        if( chunk->data[i] ) {
+          r = TEST_FAIL;
+          break;
+        }
+      }
     }
   } else {
     fprintf( stderr, "Chunk has wrong length\n" );
@@ -142,6 +148,25 @@ szx_write_block_test( const char *id, libspectrum_machine machine,
   libspectrum_free( chunk );
 
   return r;
+}
+
+static test_return_t
+szx_write_block_test( const char *id, libspectrum_machine machine,
+    void (*setter)( libspectrum_snap* ),
+    libspectrum_byte *expected, size_t expected_length )
+{
+  return szx_write_block_test_with_flags( id, machine, 0, setter,
+      expected, expected_length, expected_length );
+}
+
+static test_return_t
+szx_write_uncompressed_block_test( const char *id, libspectrum_machine machine,
+    void (*setter)( libspectrum_snap* ),
+    libspectrum_byte *expected, size_t expected_length, size_t total_length )
+{
+  return szx_write_block_test_with_flags( id, machine,
+      LIBSPECTRUM_FLAG_SNAPSHOT_NO_COMPRESSION, setter,
+      expected, expected_length, total_length );
 }
 
 static void
@@ -418,13 +443,13 @@ side_setter( libspectrum_snap *snap )
 }
 
 static libspectrum_byte
-test_41_expected[] = { /* Empty */ };
+empty_chunk_expected[] = { /* Empty */ };
 
 test_return_t
 test_41( void )
 {
   return szx_write_block_test( "SIDE", LIBSPECTRUM_MACHINE_48, side_setter,
-      test_41_expected, ARRAY_SIZE(test_41_expected) );
+      empty_chunk_expected, ARRAY_SIZE(empty_chunk_expected) );
 }
 
 static void
@@ -466,17 +491,125 @@ test_43( void )
       test_43_expected, ARRAY_SIZE(test_43_expected) );
 }
 
-static test_return_t
-szx_read_block_test( const char *id, int (*check_fn)( libspectrum_snap* ) )
+static void
+zmmc_setter( libspectrum_snap *snap )
 {
-  const char *filename_template = STATIC_TEST_PATH( "szx-chunks/%s.szx" );
+  libspectrum_snap_set_zxmmc_active( snap, 1 );
+}
+
+test_return_t
+test_57( void )
+{
+  return szx_write_block_test( "ZMMC", LIBSPECTRUM_MACHINE_48, zmmc_setter,
+      empty_chunk_expected, ARRAY_SIZE(empty_chunk_expected) );
+}
+
+static void
+ramp_setter( libspectrum_snap *snap )
+{
+  libspectrum_byte *ram = libspectrum_malloc0_n( 1, 0x4000 );
+  libspectrum_snap_set_pages( snap, 0, ram );
+}
+
+static libspectrum_byte
+empty_ram_page_expected[] = {
+  0x01, 0x00, /* Flags */
+  0x00, /* Page number */
+  /* 16 Kb of zeros compressed */
+  0x78, 0xda, 0xed, 0xc1, 0x31, 0x01, 0x00, 0x00,
+  0x00, 0xc2, 0xa0, 0xf5, 0x4f, 0x6d, 0x0c, 0x1f,
+  0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0xb7, 0x01, 0x40, 0x00, 0x00, 0x01
+};
+
+test_return_t
+test_59( void )
+{
+  return szx_write_block_test( "RAMP", LIBSPECTRUM_MACHINE_48, ramp_setter,
+      empty_ram_page_expected, ARRAY_SIZE(empty_ram_page_expected) );
+}
+
+static void
+atrp_setter( libspectrum_snap *snap )
+{
+  libspectrum_byte *ram;
+
+  libspectrum_snap_set_zxatasp_active( snap, 1 );
+  libspectrum_snap_set_zxatasp_pages( snap, 1 );
+
+  ram = libspectrum_malloc0_n( 1, 0x4000 );
+  libspectrum_snap_set_zxatasp_ram( snap, 0, ram );
+}
+
+test_return_t
+test_61( void )
+{
+  return szx_write_block_test( "ATRP", LIBSPECTRUM_MACHINE_48, atrp_setter,
+      empty_ram_page_expected, ARRAY_SIZE(empty_ram_page_expected) );
+}
+
+static void
+cfrp_setter( libspectrum_snap *snap )
+{
+  libspectrum_byte *ram;
+
+  libspectrum_snap_set_zxcf_active( snap, 1 );
+  libspectrum_snap_set_zxcf_pages( snap, 1 );
+
+  ram = libspectrum_malloc0_n( 1, 0x4000 );
+  libspectrum_snap_set_zxcf_ram( snap, 0, ram );
+}
+
+test_return_t
+test_62( void )
+{
+  return szx_write_block_test( "CFRP", LIBSPECTRUM_MACHINE_48, cfrp_setter,
+      empty_ram_page_expected, ARRAY_SIZE(empty_ram_page_expected) );
+}
+
+static libspectrum_byte
+empty_ram_page_start[] = {
+  0x00, 0x00, /* Flags */
+  0x00, /* Page number */
+  /* Followed by 16 Kb of uncompressed zeros */
+};
+
+test_return_t
+test_65( void )
+{
+  return szx_write_uncompressed_block_test( "RAMP", LIBSPECTRUM_MACHINE_48,
+      ramp_setter, empty_ram_page_start, ARRAY_SIZE(empty_ram_page_start),
+      ARRAY_SIZE(empty_ram_page_start) + 0x4000 );
+}
+
+test_return_t
+test_66( void )
+{
+  return szx_write_uncompressed_block_test( "ATRP", LIBSPECTRUM_MACHINE_48,
+      atrp_setter, empty_ram_page_start, ARRAY_SIZE(empty_ram_page_start),
+      ARRAY_SIZE(empty_ram_page_start) + 0x4000 );
+}
+
+test_return_t
+test_67( void )
+{
+  return szx_write_uncompressed_block_test( "CFRP", LIBSPECTRUM_MACHINE_48,
+      cfrp_setter, empty_ram_page_start, ARRAY_SIZE(empty_ram_page_start),
+      ARRAY_SIZE(empty_ram_page_start) + 0x4000 );
+}
+
+static test_return_t
+szx_read_block_test_with_template( const char *id, const char *template,
+    int (*check_fn)( libspectrum_snap* ) )
+{
   char filename[ 256 ];
   libspectrum_byte *buffer = NULL;
   size_t filesize = 0;
   libspectrum_snap *snap;
   int failed = 0;
 
-  snprintf( filename, 256, filename_template, id );
+  snprintf( filename, 256, template, id );
 
   if( read_file( &buffer, &filesize, filename ) ) return TEST_INCOMPLETE;
 
@@ -497,6 +630,21 @@ szx_read_block_test( const char *id, int (*check_fn)( libspectrum_snap* ) )
   libspectrum_snap_free( snap );
 
   return failed ? TEST_FAIL : TEST_PASS;
+}
+
+static test_return_t
+szx_read_block_test( const char *id, int (*check_fn)( libspectrum_snap* ) )
+{
+  return szx_read_block_test_with_template( id,
+      STATIC_TEST_PATH( "szx-chunks/%s.szx" ), check_fn );
+}
+
+static test_return_t
+szx_read_block_from_compressed_snap_test( const char *id,
+    int (*check_fn)( libspectrum_snap* ) )
+{
+  return szx_read_block_test_with_template( id,
+      STATIC_TEST_PATH( "szx-chunks/%s-uncompressed.szx.gz" ), check_fn );
 }
 
 static int
@@ -754,4 +902,92 @@ test_return_t
 test_56( void )
 {
   return szx_read_block_test( "COVX", test_56_check );
+}
+
+static int
+test_58_check( libspectrum_snap *snap )
+{
+  return libspectrum_snap_zxmmc_active( snap ) != 1;
+}
+
+test_return_t
+test_58( void )
+{
+  return szx_read_block_test( "ZMMC", test_58_check );
+}
+
+static int
+empty_ram_page_check( libspectrum_snap *snap,
+    libspectrum_byte* (*get_ram_page)( libspectrum_snap*, int ) )
+{
+  int failed = 0;
+  size_t i;
+
+  libspectrum_byte *page = get_ram_page( snap, 0 );
+  if( page ) {
+    for( i = 0; i < 0x4000; i++ ) {
+      if( page[i] ) {
+        failed = 1;
+        break;
+      }
+    }
+  } else {
+    failed = 1;
+  }
+
+  return failed;
+}
+
+static int
+ramp_check( libspectrum_snap *snap )
+{
+  return empty_ram_page_check( snap, libspectrum_snap_pages );
+}
+
+test_return_t
+test_60( void )
+{
+  return szx_read_block_test( "RAMP", ramp_check );
+}
+
+static int
+atrp_check( libspectrum_snap *snap )
+{
+  return empty_ram_page_check( snap, libspectrum_snap_zxatasp_ram );
+}
+
+test_return_t
+test_63( void )
+{
+  return szx_read_block_test( "ATRP", atrp_check );
+}
+
+static int
+cfrp_check( libspectrum_snap *snap )
+{
+  return empty_ram_page_check( snap, libspectrum_snap_zxcf_ram );
+}
+
+test_return_t
+test_64( void )
+{
+  return szx_read_block_test( "CFRP", cfrp_check );
+}
+
+test_return_t
+test_68( void )
+{
+  return szx_read_block_from_compressed_snap_test( "RAMP", ramp_check );
+}
+
+test_return_t
+test_69( void )
+{
+  return szx_read_block_from_compressed_snap_test( "ATRP", atrp_check );
+}
+
+test_return_t
+test_70( void )
+{
+  return szx_read_block_from_compressed_snap_test( "CFRP", cfrp_check );
 }
