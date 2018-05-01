@@ -1,3 +1,11 @@
+2018-04-29  Philip Kendall  <philip-fuse@shadowmagic.org.uk>
+
+        * libspectrum 1.4.2 released.
+
+        * RZX files containing a snapshot which cannot be compressed are
+          now written correctly (fixes bug #418) (Philip Kendall, thanks
+          Chris Flynn).
+
 2017-10-10  Philip Kendall  <philip-fuse@shadowmagic.org.uk>
 
         * libspectrum 1.4.1 released.
