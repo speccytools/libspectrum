@@ -1,4 +1,4 @@
-libspectrum 1.4.2
+libspectrum 1.4.3
 =================
 
 libspectrum is a fairly simple library designed to make the handling
@@ -1056,6 +1056,13 @@ libspectrum_tape_iterator_next( libspectrum_tape_iterator *iterator )
 
 Make the already initialised `iterator' point to the next block of
 `tape' and return that block (or NULL if there are no more blocks).
+
+libspectrum_tape_block *
+libspectrum_tape_iterator_peek_next( libspectrum_tape_iterator iterator )
+
+Make the already initialised `iterator' return the next block of
+`tape' (or NULL if there are no more blocks). The position of the `iterator'
+is not modified.
 
 Tape blocks
 -----------
