@@ -22,7 +22,7 @@
 
 */
 
-#include <config.h>
+#include "config.h"
 
 #include <string.h>
 
@@ -355,6 +355,10 @@ libspectrum_sna_write( libspectrum_buffer *buffer, int *out_flags,
   if( libspectrum_snap_divmmc_active( snap ) )
     *out_flags |= LIBSPECTRUM_FLAG_SNAPSHOT_MAJOR_INFO_LOSS;
   if( libspectrum_snap_zxmmc_active( snap ) )
+    *out_flags |= LIBSPECTRUM_FLAG_SNAPSHOT_MAJOR_INFO_LOSS;
+
+  /* We don't save the TTX2000S state at all */
+  if( libspectrum_snap_ttx2000s_active( snap ) )
     *out_flags |= LIBSPECTRUM_FLAG_SNAPSHOT_MAJOR_INFO_LOSS;
 
   buffer_mem = libspectrum_buffer_alloc();
