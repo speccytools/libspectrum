@@ -437,7 +437,10 @@ libspectrum_tape_get_next_edge_internal( libspectrum_dword *tstates,
       break;
 
     case LIBSPECTRUM_TAPE_BLOCK_STOP48:
-      *tstates = 0; *flags |= LIBSPECTRUM_TAPE_FLAGS_STOP48; end_of_block = 1;
+      *tstates = 0;
+      *flags |= LIBSPECTRUM_TAPE_FLAGS_STOP48;
+      *flags |= LIBSPECTRUM_TAPE_FLAGS_NO_EDGE;
+      end_of_block = 1;
       break;
 
     case LIBSPECTRUM_TAPE_BLOCK_SET_SIGNAL_LEVEL:
@@ -1250,7 +1253,7 @@ libspectrum_tape_peek_next_block( libspectrum_tape *tape )
 }
 
 /* Peek at the last block on the tape */
-libspectrum_tape_block WIN32_DLL *
+libspectrum_tape_block LIBSPECTRUM_API *
 libspectrum_tape_peek_last_block( libspectrum_tape *tape )
 {
   return tape->last_block ? tape->last_block->data : NULL;
