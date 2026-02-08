@@ -29,10 +29,10 @@
 void
 atomic_lock( atomic_char *lock_ptr )
 {
-  char locked = ATOMIC_VAR_INIT( 1 );
+  char locked = 1;
   char unlocked;
   do {
-    unlocked = ATOMIC_VAR_INIT( 0 );
+    unlocked = 0;
   } while( !atomic_compare_exchange_strong( lock_ptr, &unlocked, locked ) );
 }
 
@@ -40,8 +40,8 @@ void
 atomic_unlock( atomic_char *lock_ptr )
 {
   char locked;
-  char unlocked = ATOMIC_VAR_INIT( 0 );
+  char unlocked = 0;
   do {
-    locked = ATOMIC_VAR_INIT( 1 );
+    locked = 1;
   } while( !atomic_compare_exchange_strong( lock_ptr, &locked, unlocked ) );
 }

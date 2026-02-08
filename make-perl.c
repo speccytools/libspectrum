@@ -301,6 +301,10 @@ int main(void)
     printf( "#define GINT_TO_POINTER(i)      ((gpointer)  (glong)(i))\n" );
     printf( "#define GPOINTER_TO_INT(p)      ((gint)   (glong)(p))\n" );
     printf( "#define GPOINTER_TO_UINT(p)     ((guint)  (gulong)(p))\n" );
+  } else if( sizeof( void* ) == sizeof( long long ) ) {
+    printf( "#define GINT_TO_POINTER(i)      ((gpointer)  (long long)(i))\n" );
+    printf( "#define GPOINTER_TO_INT(p)      ((gint)   (long long)(p))\n" );
+    printf( "#define GPOINTER_TO_UINT(p)     ((guint)  (unsigned long long)(p))\n" );
   } else {
     fprintf( stderr, "No plausible int to pointer cast found\n" );
     return 1;

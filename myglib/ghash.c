@@ -64,7 +64,7 @@ static GHashNode *node_allocated_list = NULL;
 
 #ifdef HAVE_STDATOMIC_H
 
-static atomic_char atomic_locker = ATOMIC_VAR_INIT(0);
+static atomic_char atomic_locker = 0;
 
 #define lock() atomic_lock( &atomic_locker )
 #define unlock() atomic_unlock( &atomic_locker )
