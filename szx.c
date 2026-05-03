@@ -1,5 +1,5 @@
 /* szx.c: Routines for .szx snapshots
-   Copyright (c) 1998-2016 Philip Kendall, Fredrick Meunier, Stuart Brady
+   Copyright (c) 1998-2023 Philip Kendall, Fredrick Meunier, Stuart Brady
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -311,7 +311,7 @@ write_atrp_chunk( libspectrum_buffer *buffer, libspectrum_buffer *block_data,
 static void
 write_zxcf_chunk( libspectrum_buffer *buffer, libspectrum_buffer *data,
 		  libspectrum_snap *snap );
-static void
+static libspectrum_error
 write_cfrp_chunk( libspectrum_buffer *buffer, libspectrum_buffer *block_data,
                   libspectrum_snap *snap, int page, int compress );
 static void
@@ -338,6 +338,9 @@ write_mfce_chunk( libspectrum_buffer *buffer, libspectrum_buffer *data,
 static void
 write_zmmc_chunk( libspectrum_buffer *buffer, libspectrum_buffer *data,
 		  libspectrum_snap *snap );
+static void
+write_uspeech_chunk( libspectrum_buffer *buffer, libspectrum_buffer *data,
+                     libspectrum_snap *snap );
 
 #ifdef HAVE_ZLIB_H
 
@@ -2444,6 +2447,30 @@ read_zmmc_chunk( libspectrum_snap *snap, libspectrum_word version GCC_UNUSED,
 }
 
 static libspectrum_error
+read_uspeech_chunk( libspectrum_snap *snap, libspectrum_word version GCC_UNUSED,
+                    const libspectrum_byte **buffer,
+                    const libspectrum_byte *end GCC_UNUSED, size_t data_length,
+                    szx_context *ctx GCC_UNUSED )
+{
+  libspectrum_byte paged;
+
+  if( data_length != 1 ) {
+    libspectrum_print_error( LIBSPECTRUM_ERROR_UNKNOWN,
+                             "%s:read_uspeech_chunk: unknown length %lu",
+                             __FILE__, (unsigned long)data_length );
+    return LIBSPECTRUM_ERROR_UNKNOWN;
+  }
+
+  paged = *(*buffer)++;
+
+  libspectrum_snap_set_uspeech_paged( snap, paged );
+
+  libspectrum_snap_set_uspeech_active( snap, 1 );
+
+  return LIBSPECTRUM_ERROR_NONE;
+}
+
+static libspectrum_error
 skip_chunk( libspectrum_snap *snap GCC_UNUSED,
 	    libspectrum_word version GCC_UNUSED,
 	    const libspectrum_byte **buffer,
@@ -2501,7 +2528,7 @@ static struct read_chunk_t read_chunks[] = {
   { ZXSTBID_SPECTRANETFLASHPAGE, read_snef_chunk },
   { ZXSTBID_SPECTRANETRAMPAGE,   read_sner_chunk },
   { ZXSTBID_TIMEXREGS,	         read_scld_chunk },
-  { ZXSTBID_USPEECH,	         skip_chunk      },
+  { ZXSTBID_USPEECH,	         read_uspeech_chunk },
   { ZXSTBID_Z80REGS,	         read_z80r_chunk },
   { ZXSTBID_ZXATASPRAMPAGE,      read_atrp_chunk },
   { ZXSTBID_ZXATASP,	         read_zxat_chunk },
@@ -2800,7 +2827,11 @@ libspectrum_szx_write( libspectrum_buffer *buffer, int *out_flags,
     write_zxcf_chunk( buffer, block_data, snap );
 
     for( i = 0; i < libspectrum_snap_zxcf_pages( snap ); i++ ) {
-      write_cfrp_chunk( buffer, block_data, snap, i, compress );
+      error = write_cfrp_chunk( buffer, block_data, snap, i, compress );
+      if( error != LIBSPECTRUM_ERROR_NONE ) {
+        libspectrum_buffer_free( block_data );
+        return error;
+      }
     }
   }
 
@@ -2918,6 +2949,10 @@ libspectrum_szx_write( libspectrum_buffer *buffer, int *out_flags,
 
   if( libspectrum_snap_zxmmc_active( snap ) ) {
     write_zmmc_chunk( buffer, block_data, snap );
+  }
+
+  if( libspectrum_snap_uspeech_active( snap ) ) {
+    write_uspeech_chunk( buffer, block_data, snap );
   }
 
   libspectrum_buffer_free( block_data );
@@ -3781,14 +3816,23 @@ write_zxcf_chunk( libspectrum_buffer *buffer, libspectrum_buffer *data,
   write_chunk( buffer, ZXSTBID_ZXCF, data );
 }
 
-static void
+static libspectrum_error
 write_cfrp_chunk( libspectrum_buffer *buffer, libspectrum_buffer *block_data,
                   libspectrum_snap *snap, int page, int compress )
 {
+  if( page >= SNAPSHOT_ZXCF_PAGES ) {
+        libspectrum_print_error( LIBSPECTRUM_ERROR_INVALID,
+                "%s:write_cfrp_chunk: page number %lu too high",
+              __FILE__, (unsigned long)page );
+        return LIBSPECTRUM_ERROR_INVALID;
+  }
+
   const libspectrum_byte *data = libspectrum_snap_zxcf_ram( snap, page );
 
   write_ram_page( buffer, block_data, ZXSTBID_ZXCFRAMPAGE, data, 0x4000, page,
                   compress, 0x00 );
+
+  return LIBSPECTRUM_ERROR_NONE;
 }
 
 #ifdef HAVE_ZLIB_H
@@ -4155,6 +4199,16 @@ write_zmmc_chunk( libspectrum_buffer *buffer, libspectrum_buffer *data,
                   libspectrum_snap *snap )
 {
   write_chunk( buffer, ZXSTBID_ZXMMC, NULL );
+}
+
+static void
+write_uspeech_chunk( libspectrum_buffer *buffer, libspectrum_buffer *data,
+                     libspectrum_snap *snap )
+{
+  libspectrum_buffer_write_byte( data,
+                                 libspectrum_snap_uspeech_paged( snap ) );
+
+  write_chunk( buffer, ZXSTBID_USPEECH, data );
 }
 
 static void

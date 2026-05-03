@@ -1,0 +1,177 @@
+name: Libspectrum for MacOS
+run-name: Build and test Libspectrum for MacOS / ${{ github.actor }} /
+
+on:
+  # Called from fuse app, fuse utils repos
+  workflow_call:
+    inputs:
+      # Name this setup (no spaces please)
+      key:
+        type: string
+        required: true
+      # Path where to clone
+      path:
+        type: string
+        required: false
+        default: '.'
+      # Which branch to checkout
+      branch:
+        type: string
+        required: false
+        default: ""
+      # Configure supported libs
+      use_zlib:
+        type: boolean
+        required: false
+        default: true
+      use_bzip2:
+        type: boolean
+        required: false
+        default: true
+      use_libgcrypt:
+        type: boolean
+        required: false
+        default: true
+      use_fake_glib:
+        type: boolean
+        required: false
+        default: false
+      # Repo is taken from var.LIBSPECTRUM_REPO, cannot be passed as input.
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: macos-26
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.path || '.' }}
+    env:
+      # Support push and call triggers, set env.variables
+      LIBSPECTRUM_REPO: ${{ vars.LIBSPECTRUM_REPO || '' }}
+      LIBSPECTRUM_BRANCH: ${{ inputs.branch || '' }}
+      LIBSPECTRUM_PATH: ${{ inputs.path || '.' }}
+
+    steps:
+      - name: (1) Prepare environment
+        run: |
+          echo -n "Current directory: "
+          pwd
+          ls -la
+          
+          echo "Libspectrum repo: $LIBSPECTRUM_REPO"
+          echo "Libspectrum branch: $LIBSPECTRUM_BRANCH"
+          echo "Libspectrum path: $LIBSPECTRUM_PATH"
+          
+          echo "Use lib zlib: ${{ inputs.use_zlib && 'yes' || 'no' }}"
+          echo "Use lib bzip2: ${{ inputs.use_bzip2 && 'yes' || 'no' }}"
+          echo "Use lib libgcrypt: ${{ inputs.use_libgcrypt && 'yes' || 'no' }}"
+          echo "Use lib libaudiofile: no"
+          echo "Use fake glib: ${{ inputs.use_fake_glib && 'yes' || 'no' }}"
+
+      - name: (2) Check out repository code
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.LIBSPECTRUM_REPO }}
+          ref: ${{ env.LIBSPECTRUM_BRANCH }}
+          path: ${{ env.LIBSPECTRUM_PATH }}
+
+      - name: (3) Restore lib packages
+        run: |
+          echo "Not needed here"
+
+      - name: (4) Install dependencies
+        run: |
+          echo "Inspect if brew installed .."
+          brew doctor || true
+          
+          echo "Installing dependencies .."
+          brew install \
+            automake \
+            bzip2 \
+            libgcrypt \
+            libtool \
+            glib
+
+          echo "Configuring Homebrew search paths .."
+          echo "CPPFLAGS=-I$(brew --prefix)/include -I$(brew --prefix bzip2)/include -I$(brew --prefix libgcrypt)/include -I$(brew --prefix glib)/include" >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L$(brew --prefix)/lib -L$(brew --prefix bzip2)/lib -L$(brew --prefix libgcrypt)/lib -L$(brew --prefix glib)/lib" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$(brew --prefix)/lib/pkgconfig:$(brew --prefix bzip2)/lib/pkgconfig:$(brew --prefix libgcrypt)/lib/pkgconfig:$(brew --prefix glib)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+
+      - name: (5) Save lib packages
+        run: |
+          echo "Not needed here"
+
+      - name: (6) Autogen.sh
+        run: |
+          echo "Running autogen.sh .."
+          ./autogen.sh
+
+      - name: (7) Configure for MacOS
+        run: |
+          echo "Running configure .."
+          ./configure \
+          ${{ inputs.use_zlib == false && '--without-zlib' || '' }} \
+          ${{ inputs.use_bzip2 == false && '--without-bzip2' || '' }} \
+          ${{ inputs.use_libgcrypt == false && '--without-libgcrypt' || '' }} \
+          --without-libaudiofile \
+          ${{ inputs.use_fake_glib == true && '--with-fake-glib' || '' }} \
+          | tee ./configure.out
+
+      - name: (8) Verify output from configure
+        run: |
+          .github/scripts/in_config.sh "libspectrum is ready to be compiled"
+          .github/scripts/in_config.sh "zlib support: ${{ inputs.use_zlib && 'yes' || 'no' }}"
+          .github/scripts/in_config.sh "bzip2 support: ${{ inputs.use_bzip2 && 'yes' || 'no' }}"
+          .github/scripts/in_config.sh "libgcrypt support: ${{ inputs.use_libgcrypt && 'yes' || 'no' }}"
+          .github/scripts/in_config.sh "libaudiofile support: no"
+          .github/scripts/in_config.sh "Internal GLib replacement: ${{ inputs.use_fake_glib && 'yes' || 'no' }}"
+
+      - name: (9) Make
+        run: |
+          echo "Running make .."
+          make
+
+      - name: (10) Install
+        run: |
+          echo "Running make install .."
+          sudo make install
+
+      - name: (11) Copy dependencies
+        run: |
+          echo "Not needed here."
+
+      - name: (12) Run tests
+        id: run-tests
+        run: |
+          echo "Building and running tests .."
+          make check
+
+      - name: (13) Verbose check tests (on failure)
+        if: failure() && steps.run-tests.outcome != 'success'
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          
+          echo "Listing all tests individually .."
+          test/test
+
+      - name: (14) Pack installed library files
+        # Need to pack files to maintain permissions (+x mainly)
+        run: |
+          find /usr/local | grep libspectrum > .tar_files
+          sudo tar -cvf \
+          libspectrum-installed-macos.tar \
+          -C /usr/local/ -T.tar_files
+
+      - name: (15) Upload generated tar file
+        uses: actions/upload-artifact@v6
+        with: 
+          name: libspectrum-installed-macos-${{ inputs.key }}
+          path: |
+            libspectrum-installed-macos.tar
+
+      - name: (16) Finish
+        run: |
+          echo "🍏 Finishing with status ${{ job.status }}."

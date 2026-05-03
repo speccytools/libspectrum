@@ -49,7 +49,7 @@ AC_ARG_ENABLE(audiofiletest, [  --disable-audiofiletest       Do not try to comp
            sed 's/\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)/\3/'`
     if test "x$enable_audiofiletest" = "xyes" ; then
       AC_LANG_SAVE
-      AC_LANG_C
+      AC_LANG([C])
       ac_save_CFLAGS="$CFLAGS"
       ac_save_LIBS="$LIBS"
       CFLAGS="$CFLAGS $AUDIOFILE_CFLAGS"
@@ -59,7 +59,7 @@ dnl Now check if the installed Audio File Library is sufficiently new.
 dnl (Also checks the sanity of the results of audiofile-config to some extent.)
 dnl
       rm -f conf.audiofiletest
-      AC_TRY_RUN([
+      AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -113,7 +113,7 @@ int main ()
     }
 }
 
-],, no_audiofile=yes,[echo $ac_n "cross compiling; assumed OK... $ac_c"])
+]])],[],[no_audiofile=yes],[echo $ac_n "cross compiling; assumed OK... $ac_c"])
        CFLAGS="$ac_save_CFLAGS"
        LIBS="$ac_save_LIBS"
        AC_LANG_RESTORE
@@ -137,14 +137,13 @@ END
        else
           echo "*** Could not run Audio File Library test program; checking why..."
           AC_LANG_SAVE
-          AC_LANG_C
+          AC_LANG([C])
           CFLAGS="$CFLAGS $AUDIOFILE_CFLAGS"
           LIBS="$LIBS $AUDIOFILE_LIBS"
-          AC_TRY_LINK([
+          AC_LINK_IFELSE([AC_LANG_PROGRAM([[
 #include <stdio.h>
 #include <audiofile.h>
-],      [ return 0; ],
-        [ cat <<END
+]], [[ return 0; ]])],[ cat <<END
 *** The test program compiled, but did not run.  This usually means that
 *** the run-time linker is not finding Audio File Library or finding the
 *** wrong version of Audio File Library.
@@ -158,8 +157,7 @@ END
 *** you may also be able to get things to work by modifying
 *** LD_LIBRARY_PATH.
 END
-        ],
-        [ echo "*** The test program failed to compile or link. See the file config.log"
+        ],[ echo "*** The test program failed to compile or link. See the file config.log"
           echo "*** for the exact error that occured. This usually means the Audio File"
           echo "*** Library was incorrectly installed or that you have moved the Audio"
           echo "*** File Library since it was installed. In the latter case, you may want"

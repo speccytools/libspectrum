@@ -1,4 +1,4 @@
-libspectrum 1.5.0
+libspectrum 1.6.0
 =================
 
 libspectrum is a library which is designed to make the input and
@@ -27,10 +27,13 @@ $ make
 and then `make install' should install it in `/usr/local' ready for
 use on your system. If you want to install it somewhere other than
 `/usr/local', give the `--prefix=DIR' option to `configure' to install
-it under `DIR'. Once installed, some work will probably be necessary
-to ensure that the linker can find libspectrum. Either read the
-instructions printed when you do `make install' or ask your local
-guru.
+it under `DIR'. Once installed, some work may still be necessary to
+ensure that the runtime linker can find libspectrum. For example, on
+some Linux systems you may need to run `ldconfig' as root after
+`make install' (for example `sudo ldconfig') before newly installed
+libraries in `/usr/local/lib' are found. Otherwise, follow the
+instructions printed by `make install' or your system's normal shared
+library configuration procedure.
 
 For details on the functions available, see `doc/libspectrum.txt'.
 
@@ -67,4 +70,4 @@ Wii. At the time of writing, those haven't been ported yet.
 Then, type "make" and if everything went well, "make install".
 
 Philip Kendall <philip-fuse@shadowmagic.org.uk>
-27th February, 2021
+9th March, 2026

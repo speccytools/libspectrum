@@ -59,7 +59,7 @@ while(<>) {
 
 print << "CODE";
 /* snap_accessors.c: simple accessor functions for libspectrum_snap
-   Copyright (c) 2003-2009 Philip Kendall
+   Copyright (c) 2003-2021 Philip Kendall
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by

@@ -61,7 +61,7 @@ data_block_init( libspectrum_tape_data_block *block,
 libspectrum_tape_block*
 libspectrum_tape_block_alloc( libspectrum_tape_type type )
 {
-  libspectrum_tape_block *block = libspectrum_new( libspectrum_tape_block, 1 );
+  libspectrum_tape_block *block = libspectrum_new0( libspectrum_tape_block, 1 );
   libspectrum_tape_block_set_type( block, type );
   return block;
 }

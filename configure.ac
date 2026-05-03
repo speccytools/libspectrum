@@ -1,5 +1,5 @@
 dnl Process this file with autoconf to produce a configure script.
-dnl Copyright (c) 1999-2021 Philip Kendall
+dnl Copyright (c) 1999-2026 Philip Kendall
 
 dnl This program is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -20,11 +20,11 @@ dnl
 dnl E-mail: philip-fuse@shadowmagic.org.uk
 
 dnl Package version
-m4_define([libspectrum_version], [1.5.0])
+m4_define([libspectrum_version], [1.6.0])
 
 dnl Product full version
 m4_define([libspectrum_major_version], [1])
-m4_define([libspectrum_minor_version], [5])
+m4_define([libspectrum_minor_version], [6])
 m4_define([libspectrum_micro_version], [0])
 m4_define([libspectrum_nano_version],  [0])
 m4_define([libspectrum_full_version],
@@ -33,11 +33,11 @@ m4_define([libspectrum_rc_version],
           [libspectrum_major_version,libspectrum_minor_version,libspectrum_micro_version,libspectrum_nano_version])
 
 dnl Package info
-m4_define([libspectrum_copyright], ["(c) 1999-2021 Philip Kendall and others"])
+m4_define([libspectrum_copyright], ["(c) 1999-2026 Philip Kendall and others"])
 m4_define([libspectrum_url],
-          [http://fuse-emulator.sourceforge.net/libspectrum.php])
+          [https://fuse-emulator.sourceforge.net/libspectrum.php])
 m4_define([libspectrum_bugreport],
-          [http://sourceforge.net/p/fuse-emulator/bugs/])
+          [https://sourceforge.net/p/fuse-emulator/bugs/])
 
 AC_INIT([libspectrum],[libspectrum_version],[libspectrum_bugreport],
         [libspectrum],[libspectrum_url])
@@ -85,11 +85,7 @@ AC_PATH_PROG(PERL, perl)
 AC_SUBST(PERL)
 
 dnl Checks for header files.
-AC_HEADER_STDC
 AC_CHECK_HEADERS(stdint.h strings.h unistd.h)
-
-dnl Checks for typedefs, structures, and compiler characteristics.
-AC_C_CONST
 
 dnl Check for host specific programs
 WINDRES_OBJ=
@@ -183,9 +179,22 @@ AS_IF([test "$myglib" = no], [
     AC_MSG_ERROR([GLib not found])
   )
 ])
+stdatomic_available=no
 AS_IF([test "$myglib" = yes], [
-  AC_CHECK_HEADERS(
-    stdatomic.h, [stdatomic_available=yes])
+  AC_MSG_CHECKING([whether stdatomic.h provides usable atomics])
+  AC_COMPILE_IFELSE([
+    AC_LANG_PROGRAM([[#include <stdatomic.h>]], [[
+      static atomic_char lock_var = 0;
+      char desired = 1;
+      char expected = 0;
+      return atomic_compare_exchange_strong( &lock_var, &expected, 1 ) ? 0 : 1;
+    ]])
+  ], [
+    stdatomic_available=yes
+    AC_DEFINE([HAVE_STDATOMIC_H], [1],
+              [Defined if stdatomic.h provides usable atomics])
+  ])
+  AC_MSG_RESULT([$stdatomic_available])
 ])
 
 AM_CONDITIONAL(USE_MYGLIB, test "$myglib" = yes)
@@ -217,6 +226,16 @@ AC_ARG_WITH(libaudiofile,
 if test "$withval" = no; then libaudiofile=no; else libaudiofile=yes; fi,
 libaudiofile=yes)
 AC_MSG_RESULT($libaudiofile)
+
+AC_ARG_WITH(wav-backend,
+[  --with-wav-backend=auto|audiofile|macos|none  select WAV backend],
+[wav_backend_requested="$withval"],
+[wav_backend_requested="auto"])
+
+AS_CASE([$wav_backend_requested],
+  [auto|audiofile|macos|none], [],
+  [AC_MSG_FAILURE([invalid WAV backend '$wav_backend_requested'])])
+
 have_libaudiofile="no"
 AS_IF([test "$libaudiofile" = yes], [
   PKG_CHECK_MODULES(
@@ -234,6 +253,100 @@ AS_IF([test "$libaudiofile" = yes], [
     )
   fi
 ])
+
+dnl Check for native macOS frameworks for WAV support
+MACOS_WAV_LIBS=
+have_macos_wav="no"
+AS_CASE([$host_os], [darwin*], [
+  AC_MSG_CHECKING([for native macOS WAV frameworks])
+  save_LIBS="$LIBS"
+  LIBS="$LIBS -framework AudioToolbox -framework CoreFoundation"
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([
+      [#include <AudioToolbox/AudioToolbox.h>
+        #include <CoreFoundation/CoreFoundation.h>]
+    ], [
+      ExtAudioFileRef file = NULL;
+      CFURLRef url = NULL;
+      return ExtAudioFileOpenURL( url, &file );
+    ])
+  ], [
+    AC_DEFINE([HAVE_MACOS_NATIVE_WAV], 1,
+              [Defined if native macOS WAV frameworks are available])
+    MACOS_WAV_LIBS="-framework AudioToolbox -framework CoreFoundation"
+    have_macos_wav="yes"
+  ])
+  LIBS="$save_LIBS"
+  AC_MSG_RESULT([$have_macos_wav])
+])
+AC_SUBST(MACOS_WAV_LIBS)
+
+WAV_BACKEND_CPPFLAGS=
+WAV_BACKEND_LIBADD=
+WAV_BACKEND_LDFLAGS=
+WAV_BACKEND_PRIVATE_LIBS=
+
+selected_wav_backend="none"
+AS_CASE([$wav_backend_requested],
+  [auto], [
+    AS_CASE([$host_os],
+      [darwin*], [
+        if test "$have_macos_wav" = yes; then
+          selected_wav_backend="macos"
+        elif test "$have_libaudiofile" = yes; then
+          selected_wav_backend="audiofile"
+        fi
+      ], [
+        if test "$have_libaudiofile" = yes; then
+          selected_wav_backend="audiofile"
+        fi
+      ])
+  ],
+  [audiofile], [
+    if test "$have_libaudiofile" = yes; then
+      selected_wav_backend="audiofile"
+    else
+      AC_MSG_FAILURE([libaudiofile WAV backend requested but unavailable])
+    fi
+  ],
+  [macos], [
+    if test "$have_macos_wav" = yes; then
+      selected_wav_backend="macos"
+    else
+      AC_MSG_FAILURE([macOS WAV backend requested but unavailable])
+    fi
+  ])
+
+have_wav_backend="no"
+AS_CASE([$selected_wav_backend],
+  [audiofile], [
+    AC_DEFINE([HAVE_WAV_BACKEND], 1, [Defined if a WAV backend is available])
+    AC_DEFINE([WAV_INTERNAL_AUDIOFILE], 1,
+              [Defined if the libaudiofile WAV internals are selected])
+    WAV_BACKEND_CPPFLAGS="$AUDIOFILE_CFLAGS"
+    WAV_BACKEND_LIBADD="$AUDIOFILE_LIBS"
+    WAV_BACKEND_PRIVATE_LIBS="$AUDIOFILE_LIBS"
+    have_wav_backend="yes"
+  ],
+  [macos], [
+    AC_DEFINE([HAVE_WAV_BACKEND], 1, [Defined if a WAV backend is available])
+    AC_DEFINE([WAV_INTERNAL_MACOS], 1,
+              [Defined if the macOS WAV internals are selected])
+    WAV_BACKEND_LDFLAGS="$MACOS_WAV_LIBS"
+    WAV_BACKEND_PRIVATE_LIBS="$MACOS_WAV_LIBS"
+    have_wav_backend="yes"
+  ])
+
+AC_SUBST(WAV_BACKEND_CPPFLAGS)
+AC_SUBST(WAV_BACKEND_LIBADD)
+AC_SUBST(WAV_BACKEND_LDFLAGS)
+AC_SUBST(WAV_BACKEND_PRIVATE_LIBS)
+
+AM_CONDITIONAL([WAV_SUPPORT], [test "$have_wav_backend" = yes])
+AM_CONDITIONAL([WAV_INTERNAL_AUDIOFILE],
+               [test "$selected_wav_backend" = audiofile])
+AM_CONDITIONAL([WAV_INTERNAL_MACOS],
+               [test "$selected_wav_backend" = macos])
 
 AC_CONFIG_FILES([
   Makefile
@@ -253,6 +366,8 @@ echo "zlib support: $have_zlib"
 echo "bzip2 support: $have_bzip2"
 echo "libgcrypt support: $have_libgcrypt"
 echo "libaudiofile support: $have_libaudiofile"
+echo "native macOS WAV support: $have_macos_wav"
+echo "selected WAV backend: $selected_wav_backend"
 echo "Internal GLib replacement: $myglib"
 echo ""
 echo "Type 'make' to compile libspectrum"

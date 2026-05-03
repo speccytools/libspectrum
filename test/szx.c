@@ -1,5 +1,5 @@
 /* szx.c: SZX test routines
-   Copyright (c) 2017 Philip Kendall
+   Copyright (c) 2017,2023 Philip Kendall
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -104,6 +104,7 @@ szx_write_block_test_with_flags( const char *id, libspectrum_machine machine,
 {
   libspectrum_snap *snap;
   libspectrum_byte *buffer; size_t length;
+  libspectrum_error error;
   int out_flags;
   szx_chunk_t *chunk;
   size_t i;
@@ -117,8 +118,14 @@ szx_write_block_test_with_flags( const char *id, libspectrum_machine machine,
 
   length = 0;
   buffer = NULL;
-  libspectrum_snap_write( &buffer, &length, &out_flags, snap,
+  error = libspectrum_snap_write( &buffer, &length, &out_flags, snap,
                           LIBSPECTRUM_ID_SNAPSHOT_SZX, NULL, flags );
+  if (error != LIBSPECTRUM_ERROR_NONE) {
+    fprintf( stderr, "Snap write failed with error %d\n", error );
+    if (buffer)
+      libspectrum_free( buffer );
+    return TEST_INCOMPLETE;
+  }
   libspectrum_snap_free( snap );
 
   chunk = find_szx_chunk( buffer, length, id );
@@ -144,7 +151,8 @@ szx_write_block_test_with_flags( const char *id, libspectrum_machine machine,
       }
     }
   } else {
-    fprintf( stderr, "Chunk has wrong length\n" );
+    fprintf( stderr, "Chunk has wrong length (expected %lu, got %lu)\n",
+    (unsigned long)total_length, (unsigned long)chunk->length );
     r = TEST_FAIL;
   }
 
@@ -157,10 +165,10 @@ szx_write_block_test_with_flags( const char *id, libspectrum_machine machine,
 static test_return_t
 szx_write_block_test( const char *id, libspectrum_machine machine,
     void (*setter)( libspectrum_snap* ),
-    libspectrum_byte *expected, size_t expected_length )
+    libspectrum_byte *expected, size_t expected_length, size_t total_length )
 {
   return szx_write_block_test_with_flags( id, machine, 0, setter,
-      expected, expected_length, expected_length );
+      expected, expected_length, total_length );
 }
 
 static test_return_t
@@ -223,7 +231,7 @@ test_return_t
 test_31( void )
 {
   return szx_write_block_test( "Z80R", LIBSPECTRUM_MACHINE_48, z80r_setter,
-      test_31_expected, ARRAY_SIZE(test_31_expected) );
+      test_31_expected, ARRAY_SIZE(test_31_expected), ARRAY_SIZE(test_31_expected) );
 }
 
 static void
@@ -244,7 +252,7 @@ test_return_t
 test_32( void )
 {
   return szx_write_block_test( "SPCR", LIBSPECTRUM_MACHINE_PLUS3, spcr_setter,
-      test_32_expected, ARRAY_SIZE(test_32_expected) );
+      test_32_expected, ARRAY_SIZE(test_32_expected), ARRAY_SIZE(test_32_expected) );
 }
 
 static void
@@ -269,7 +277,7 @@ test_return_t
 test_33( void )
 {
   return szx_write_block_test( "JOY\0", LIBSPECTRUM_MACHINE_48, joy_setter,
-      test_33_expected, ARRAY_SIZE(test_33_expected) );
+      test_33_expected, ARRAY_SIZE(test_33_expected), ARRAY_SIZE(test_33_expected) );
 }
 
 static void
@@ -292,7 +300,7 @@ test_return_t
 test_34( void )
 {
   return szx_write_block_test( "KEYB", LIBSPECTRUM_MACHINE_48, keyb_setter,
-      test_34_expected, ARRAY_SIZE(test_34_expected) );
+      test_34_expected, ARRAY_SIZE(test_34_expected), ARRAY_SIZE(test_34_expected) );
 }
 
 static void
@@ -310,7 +318,7 @@ test_return_t
 test_35( void )
 {
   return szx_write_block_test( "ZXPR", LIBSPECTRUM_MACHINE_48, zxpr_setter,
-      test_35_expected, ARRAY_SIZE(test_35_expected) );
+      test_35_expected, ARRAY_SIZE(test_35_expected), ARRAY_SIZE(test_35_expected) );
 }
 
 static libspectrum_byte
@@ -345,7 +353,7 @@ test_return_t
 test_36( void )
 {
   return szx_write_block_test( "AY\0\0", LIBSPECTRUM_MACHINE_48, ay_setter,
-      test_36_expected, ARRAY_SIZE(test_36_expected) );
+      test_36_expected, ARRAY_SIZE(test_36_expected), ARRAY_SIZE(test_36_expected) );
 }
 
 static void
@@ -364,7 +372,7 @@ test_return_t
 test_37( void )
 {
   return szx_write_block_test( "SCLD", LIBSPECTRUM_MACHINE_TC2048, scld_setter,
-      test_37_expected, ARRAY_SIZE(test_37_expected) );
+      test_37_expected, ARRAY_SIZE(test_37_expected), ARRAY_SIZE(test_37_expected) );
 }
 
 static void
@@ -393,7 +401,7 @@ test_return_t
 test_38( void )
 {
   return szx_write_block_test( "ZXAT", LIBSPECTRUM_MACHINE_48, zxat_setter,
-      test_38_expected, ARRAY_SIZE(test_38_expected) );
+      test_38_expected, ARRAY_SIZE(test_38_expected), ARRAY_SIZE(test_38_expected) );
 }
 
 static void
@@ -403,21 +411,21 @@ zxcf_setter( libspectrum_snap *snap )
 
   libspectrum_snap_set_zxcf_upload( snap, 1 );
   libspectrum_snap_set_zxcf_memctl( snap, 0x37 );
-  libspectrum_snap_set_zxcf_pages( snap, 0x55 );
+  libspectrum_snap_set_zxcf_pages( snap, 0x35 );
 }
 
 static libspectrum_byte
 test_39_expected[] = {
   0x01, 0x00, /* Flags */
   0x37, /* Memory control */
-  0x55 /* Page count */
+  0x35 /* Page count */
 };
 
 test_return_t
 test_39( void )
 {
   return szx_write_block_test( "ZXCF", LIBSPECTRUM_MACHINE_48, zxcf_setter,
-      test_39_expected, ARRAY_SIZE(test_39_expected) );
+      test_39_expected, ARRAY_SIZE(test_39_expected), ARRAY_SIZE(test_39_expected) );
 }
 
 static void
@@ -437,7 +445,7 @@ test_return_t
 test_40( void )
 {
   return szx_write_block_test( "AMXM", LIBSPECTRUM_MACHINE_48, amxm_setter,
-      test_40_expected, ARRAY_SIZE(test_40_expected) );
+      test_40_expected, ARRAY_SIZE(test_40_expected), ARRAY_SIZE(test_40_expected) );
 }
 
 static void
@@ -453,7 +461,7 @@ test_return_t
 test_41( void )
 {
   return szx_write_block_test( "SIDE", LIBSPECTRUM_MACHINE_48, side_setter,
-      empty_chunk_expected, ARRAY_SIZE(empty_chunk_expected) );
+      empty_chunk_expected, ARRAY_SIZE(empty_chunk_expected), ARRAY_SIZE(empty_chunk_expected) );
 }
 
 static void
@@ -472,7 +480,7 @@ test_return_t
 test_42( void )
 {
   return szx_write_block_test( "DRUM", LIBSPECTRUM_MACHINE_48, drum_setter,
-      test_42_expected, ARRAY_SIZE(test_42_expected) );
+      test_42_expected, ARRAY_SIZE(test_42_expected), ARRAY_SIZE(test_42_expected) );
 }
 
 static void
@@ -492,7 +500,7 @@ test_return_t
 test_43( void )
 {
   return szx_write_block_test( "COVX", LIBSPECTRUM_MACHINE_48, covx_setter,
-      test_43_expected, ARRAY_SIZE(test_43_expected) );
+      test_43_expected, ARRAY_SIZE(test_43_expected), ARRAY_SIZE(test_43_expected) );
 }
 
 static void
@@ -505,7 +513,7 @@ test_return_t
 test_57( void )
 {
   return szx_write_block_test( "ZMMC", LIBSPECTRUM_MACHINE_48, zmmc_setter,
-      empty_chunk_expected, ARRAY_SIZE(empty_chunk_expected) );
+      empty_chunk_expected, ARRAY_SIZE(empty_chunk_expected), ARRAY_SIZE(empty_chunk_expected) );
 }
 
 static void
@@ -515,6 +523,7 @@ ramp_setter( libspectrum_snap *snap )
   libspectrum_snap_set_pages( snap, 0, ram );
 }
 
+#ifdef HAVE_ZLIB_H
 static libspectrum_byte
 empty_ram_page_expected[] = {
   0x01, 0x00, /* Flags */
@@ -526,12 +535,29 @@ empty_ram_page_expected[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x80, 0xb7, 0x01, 0x40, 0x00, 0x00, 0x01
 };
+#else
+static libspectrum_byte
+empty_ram_page_uncompressed_expected[] = {
+  0x00, 0x00, /* Flags */
+  0x00, /* Page number */
+  /* 16 Kb of zeros uncompressed */
+};
+#endif
 
 test_return_t
 test_59( void )
 {
   return szx_write_block_test( "RAMP", LIBSPECTRUM_MACHINE_48, ramp_setter,
-      empty_ram_page_expected, ARRAY_SIZE(empty_ram_page_expected) );
+    #ifdef HAVE_ZLIB_H
+      /* gzip enabled in build, so block written compressed */
+      empty_ram_page_expected, ARRAY_SIZE(empty_ram_page_expected),
+      ARRAY_SIZE(empty_ram_page_expected)
+    #else
+      /* gzip not enabled in build, so block written uncompressed */
+      empty_ram_page_uncompressed_expected, ARRAY_SIZE(empty_ram_page_uncompressed_expected),
+      ARRAY_SIZE(empty_ram_page_uncompressed_expected) + 0x4000
+    #endif
+  );
 }
 
 static void
@@ -550,7 +576,16 @@ test_return_t
 test_61( void )
 {
   return szx_write_block_test( "ATRP", LIBSPECTRUM_MACHINE_48, atrp_setter,
-      empty_ram_page_expected, ARRAY_SIZE(empty_ram_page_expected) );
+    #ifdef HAVE_ZLIB_H
+      /* gzip enabled in build, so block written compressed */
+      empty_ram_page_expected, ARRAY_SIZE(empty_ram_page_expected),
+      ARRAY_SIZE(empty_ram_page_expected)
+    #else
+      /* gzip not enabled in build, so block written uncompressed */
+      empty_ram_page_uncompressed_expected, ARRAY_SIZE(empty_ram_page_uncompressed_expected),
+      ARRAY_SIZE(empty_ram_page_uncompressed_expected) + 0x4000
+    #endif
+  );
 }
 
 static void
@@ -569,7 +604,16 @@ test_return_t
 test_62( void )
 {
   return szx_write_block_test( "CFRP", LIBSPECTRUM_MACHINE_48, cfrp_setter,
-      empty_ram_page_expected, ARRAY_SIZE(empty_ram_page_expected) );
+    #ifdef HAVE_ZLIB_H
+      /* gzip enabled in build, so block written compressed */
+      empty_ram_page_expected, ARRAY_SIZE(empty_ram_page_expected),
+      ARRAY_SIZE(empty_ram_page_expected)
+    #else
+      /* gzip not enabled in build, so block written uncompressed */
+      empty_ram_page_uncompressed_expected, ARRAY_SIZE(empty_ram_page_uncompressed_expected),
+      ARRAY_SIZE(empty_ram_page_uncompressed_expected) + 0x4000
+    #endif
+  );
 }
 
 static libspectrum_byte
@@ -647,6 +691,10 @@ static test_return_t
 szx_read_block_from_compressed_snap_test( const char *id,
     int (*check_fn)( libspectrum_snap* ) )
 {
+  #ifndef HAVE_ZLIB_H
+    return TEST_SKIPPED; /* gzip not enabled in build */
+  #endif
+
   return szx_read_block_test_with_template( id,
       STATIC_TEST_PATH( "szx-chunks/%s-uncompressed.szx.gz" ), check_fn );
 }
@@ -951,6 +999,10 @@ ramp_check( libspectrum_snap *snap )
 test_return_t
 test_60( void )
 {
+  #ifndef HAVE_ZLIB_H
+    return TEST_SKIPPED; /* gzip not enabled in build */
+  #endif
+
   return szx_read_block_test( "RAMP", ramp_check );
 }
 
@@ -963,6 +1015,10 @@ atrp_check( libspectrum_snap *snap )
 test_return_t
 test_63( void )
 {
+  #ifndef HAVE_ZLIB_H
+    return TEST_SKIPPED; /* gzip not enabled in build */
+  #endif
+
   return szx_read_block_test( "ATRP", atrp_check );
 }
 
@@ -975,6 +1031,10 @@ cfrp_check( libspectrum_snap *snap )
 test_return_t
 test_64( void )
 {
+  #ifndef HAVE_ZLIB_H
+    return TEST_SKIPPED; /* gzip not enabled in build */
+  #endif
+
   return szx_read_block_test( "CFRP", cfrp_check );
 }
 

@@ -1,0 +1,56 @@
+name: Libspectrum for Windows
+run-name: Build and test Libspectrum for Windows / ${{ github.actor }} /
+
+# Executed upon each commit pushed, merge commit in PR
+on: [push, pull_request]
+  
+jobs:
+  # 1. Default = all libs enabled, fake glib is always used
+  default:
+    name: "Libspectrum + all libs (Windows)"
+    uses: ./.github/workflows/build_windows_sub.yml
+    with:
+      key: "default"
+
+  # 2. Without zlib
+  no-zlib:
+    name: "Libspectrum w/o zlib (Windows)"
+    uses: ./.github/workflows/build_windows_sub.yml
+    with:
+      key: "no-zlib"
+      use_zlib: false
+
+  # 3. Without bzip2
+  no-bzip2:
+    name: "Libspectrum w/o bzip2 (Windows)"
+    uses: ./.github/workflows/build_windows_sub.yml
+    with:
+      key: "no-bzip2"
+      use_bzip2: false
+
+  # 4. Without libgcrypt
+  no-libgcrypt:
+    name: "Libspectrum w/o libgcrypt (Windows)"
+    uses: ./.github/workflows/build_windows_sub.yml
+    with:
+      key: "no-libgcrypt"
+      use_libgcrypt: false
+
+  # 5. Without libaudiofile
+  no-libaudiofile:
+    name: "Libspectrum w/o libaudiofile (Windows)"
+    uses: ./.github/workflows/build_windows_sub.yml
+    with:
+      key: "no-libaudiofile"
+      use_libaudiofile: false
+
+  # 6. Without all libs
+  no-libs:
+    name: "Libspectrum w/o all libs (Windows)"
+    uses: ./.github/workflows/build_windows_sub.yml
+    with:
+      key: "no-libs"
+      use_zlib: false
+      use_bzip2: false
+      use_libgcrypt: false
+      use_libaudiofile: false

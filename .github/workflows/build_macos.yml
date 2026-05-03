@@ -1,0 +1,56 @@
+name: Libspectrum for MacOS
+run-name: Build and test Libspectrum for MacOS / ${{ github.actor }} /
+
+# Executed upon each commit pushed, merge commit in PR
+on: [push, pull_request]
+  
+jobs:
+  #################
+  ### FAKE GLIB ###
+  #################
+
+  # 1. Default = all libs enabled, fake glib yes
+  default-fake-glib:
+    name: "Libspectrum + all libs (MacOS, fake glib)"
+    uses: ./.github/workflows/build_macos_sub.yml
+    with:
+      key: "default-fake-glib"
+      use_fake_glib: true
+
+  # 2. Without zlib (fake glib)
+  no-zlib-fake-glib:
+    name: "Libspectrum w/o zlib (MacOS, fake glib)"
+    uses: ./.github/workflows/build_macos_sub.yml
+    with:
+      key: "no-zlib-fake-glib"
+      use_zlib: false
+      use_fake_glib: true
+
+  # 3. Without bzip2 (fake glib)
+  no-bzip2-fake-glib:
+    name: "Libspectrum w/o bzip2 (MacOS, fake glib)"
+    uses: ./.github/workflows/build_macos_sub.yml
+    with:
+      key: "no-bzip2-fake-glib"
+      use_bzip2: false
+      use_fake_glib: true
+
+  # 4. Without libgcrypt (fake glib)
+  no-libgcrypt-fake-glib:
+    name: "Libspectrum w/o libgcrypt (MacOS, fake glib)"
+    uses: ./.github/workflows/build_macos_sub.yml
+    with:
+      key: "no-libgcrypt-fake-glib"
+      use_libgcrypt: false
+      use_fake_glib: true
+
+  # 5. Without all libs (fake glib)
+  no-libs-fake-glib:
+    name: "Libspectrum w/o all libs (MacOS, fake glib)"
+    uses: ./.github/workflows/build_macos_sub.yml
+    with:
+      key: "no-libs-fake-glib"
+      use_zlib: false
+      use_bzip2: false
+      use_libgcrypt: false
+      use_fake_glib: true

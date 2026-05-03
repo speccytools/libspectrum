@@ -1,0 +1,18 @@
+name: Libspectrum for WII
+run-name: Build and test Libspectrum for WII / ${{ github.actor }} /
+
+# Executed upon each commit pushed, merge commit in PR
+on: [push, pull_request]
+  
+jobs:
+  # 1. Only one case possible - without all libs, fake glib
+  default:
+    name: "Libspectrum w/o all libs, fake glib (WII)"
+    uses: ./.github/workflows/build_wii_sub.yml
+    with:
+      key: "default"
+      use_zlib: false
+      use_bzip2: false
+      use_libgcrypt: false
+      use_libaudiofile: false
+      use_fake_glib: true

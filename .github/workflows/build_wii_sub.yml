@@ -1,0 +1,180 @@
+name: Libspectrum for WII
+run-name: Build and test Libspectrum for WII / ${{ github.actor }} /
+
+on:
+  # Called from fuse app, fuse utils repos
+  workflow_call:
+    inputs:
+      # Name this setup (no spaces please)
+      key:
+        type: string
+        required: true
+      # Path where to clone
+      path:
+        type: string
+        required: false
+        default: '.'
+      # Which branch to checkout
+      branch:
+        type: string
+        required: false
+        default: ""
+      # Configure supported libs
+      use_zlib:
+        type: boolean
+        required: false
+        default: true
+      use_bzip2:
+        type: boolean
+        required: false
+        default: true
+      use_libgcrypt:
+        type: boolean
+        required: false
+        default: true
+      use_libaudiofile:
+        type: boolean
+        required: false
+        default: true
+      use_fake_glib:
+        type: boolean
+        required: false
+        default: false
+      # Repo is taken from var.LIBSPECTRUM_REPO, cannot be passed as input.
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: devkitpro/devkitppc
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.path || '.' }}
+    env:
+      # Support push and call triggers, set env.variables
+      LIBSPECTRUM_REPO: ${{ vars.LIBSPECTRUM_REPO || '' }}
+      LIBSPECTRUM_BRANCH: ${{ inputs.branch || '' }}
+      LIBSPECTRUM_PATH: ${{ inputs.path || '.' }}
+
+    steps:
+      - name: (1) Prepare environment
+        run: |
+          echo "Libspectrum repo: $LIBSPECTRUM_REPO"
+          echo "Libspectrum branch: $LIBSPECTRUM_BRANCH"
+          echo "Libspectrum path: $LIBSPECTRUM_PATH"
+          
+          echo "Use lib zlib: ${{ inputs.use_zlib && 'yes' || 'no' }}"
+          echo "Use lib bzip2: ${{ inputs.use_bzip2 && 'yes' || 'no' }}"
+          echo "Use lib libgcrypt: ${{ inputs.use_libgcrypt && 'yes' || 'no' }}"
+          echo "Use lib libaudiofile: ${{ inputs.use_libaudiofile && 'yes' || 'no' }}"
+          echo "Use fake glib: ${{ inputs.use_fake_glib && 'yes' || 'no' }}"
+          
+          echo "Available pacman packages:"
+          dkp-pacman -Sl
+          echo ""
+          
+          echo "Available devkitPro packages:"
+          dkp-pacman -Sl dkp-libs
+          echo ""
+
+      - name: (2) Check out repository code
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.LIBSPECTRUM_REPO }}
+          ref: ${{ env.LIBSPECTRUM_BRANCH }}
+          path: ${{ env.LIBSPECTRUM_PATH }}
+
+      - name: (3) Restore lib packages
+        run: |
+          echo "Not needed here"
+
+      - name: (4) Install dependencies
+        run: |
+          echo "Installing dependencies .."
+          echo "Using devkitpro/devkitppc image"
+          sudo apt-get update
+          sudo apt-get -y install --no-install-recommends \
+            wget tar autoconf automake libtool && \
+          sudo rm -rf /var/lib/apt/lists/*
+          echo "Done."
+
+      - name: (5) Save lib packages
+        run: |
+          echo "Not needed here"
+
+      - name: (6) Autogen.sh
+        run: |
+          echo "Running autogen.sh .."
+          ./autogen.sh
+
+      - name: (7) Configure for WII
+        run: |
+          echo "Running configure .."
+          ./configure \
+          --target=powerpc-eabi \
+          --host=powerpc-eabi \
+          --prefix=$DEVKITPPC \
+          ${{ inputs.use_zlib == false && '--without-zlib' || '' }} \
+          ${{ inputs.use_bzip2 == false && '--without-bzip2' || '' }} \
+          ${{ inputs.use_libgcrypt == false && '--without-libgcrypt' || '' }} \
+          ${{ inputs.use_libaudiofile == false && '--without-libaudiofile' || '' }} \
+          ${{ inputs.use_fake_glib == true && '--with-fake-glib' || '' }} \
+          | tee ./configure.out
+
+      - name: (8) Verify output from configure
+        run: |
+          .github/scripts/in_config.sh "libspectrum is ready to be compiled"
+          .github/scripts/in_config.sh "zlib support: ${{ inputs.use_zlib && 'yes' || 'no' }}"
+          .github/scripts/in_config.sh "bzip2 support: ${{ inputs.use_bzip2 && 'yes' || 'no' }}"
+          .github/scripts/in_config.sh "libgcrypt support: ${{ inputs.use_libgcrypt && 'yes' || 'no' }}"
+          .github/scripts/in_config.sh "libaudiofile support: ${{ inputs.use_libaudiofile && 'yes' || 'no' }}"
+          .github/scripts/in_config.sh "Internal GLib replacement: ${{ inputs.use_fake_glib && 'yes' || 'no' }}"
+
+      - name: (9) Make
+        run: |
+          echo "Running make .."
+          make
+
+      - name: (10) Install
+        run: |
+          echo "Running make install .."
+          sudo make install
+
+      - name: (11) Copy dependencies
+        run: |
+          echo "Not needed here."
+
+      - name: (12) Run tests
+        id: run-tests
+        run: |
+          echo "Building and running tests .."
+          ## make check  <-- cross compiled, cannot execute under Linux
+          echo "FIXME: make check not possible, cross compiled."
+
+      - name: (13) Verbose check tests (on failure)
+        if: failure() && steps.run-tests.outcome != 'success'
+        run: |
+          echo "Listing all tests individually .."
+          ## test/test  <-- cross compiled, cannot execute under Linux
+          echo "FIXME: test/test not possible, cross compiled."
+
+      - name: (14) Pack installed library files
+        # Need to pack files to maintain permissions (+x mainly)
+        run: |
+          find /opt/devkitpro/devkitPPC | grep libspectrum > .tar_files
+          sudo tar -cvf \
+          libspectrum-installed-wii.tar \
+          -C /opt/devkitpro/devkitPPC/ -T.tar_files
+
+      - name: (15) Upload generated tar file
+        uses: actions/upload-artifact@v6
+        with: 
+          name: libspectrum-installed-wii-${{ inputs.key }}
+          path: |
+            libspectrum-installed-wii.tar
+
+      - name: (16) Finish
+        run: |
+          echo "🍏 Finishing with status ${{ job.status }}."

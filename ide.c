@@ -162,11 +162,9 @@ libspectrum_ide_alloc( libspectrum_ide_databus databus )
 {
   libspectrum_ide_channel *channel;
 
-  channel = libspectrum_new( libspectrum_ide_channel, 1 );
+  channel = libspectrum_new0( libspectrum_ide_channel, 1 );
 
   channel->databus = databus;
-  channel->drive[ LIBSPECTRUM_IDE_MASTER ].disk = NULL;
-  channel->drive[ LIBSPECTRUM_IDE_SLAVE  ].disk = NULL;
 
   channel->cache[ LIBSPECTRUM_IDE_MASTER ] =
     g_hash_table_new( g_int_hash, g_int_equal );

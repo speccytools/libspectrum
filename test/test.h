@@ -9,6 +9,7 @@ typedef enum test_return_t {
   TEST_PASS,
   TEST_FAIL,
   TEST_INCOMPLETE,
+  TEST_SKIPPED,
 } test_return_t;
 
 typedef struct test_edge_sequence_t {

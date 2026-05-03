@@ -1,5 +1,5 @@
 /* zip.h: Routines for accessing zip archives
-   Copyright (c) 2012 Sergio Baldoví
+   Copyright (c) 2012,2021 Sergio Baldoví
 
    Based on zip routines from ZXDS.
    Copyright (c) 2010 Patrik Rak

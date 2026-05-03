@@ -1,5 +1,5 @@
 /* z80.c: Routines for handling .z80 snapshots
-   Copyright (c) 2001-2016 Philip Kendall, Darren Salt, Fredrick Meunier
+   Copyright (c) 2001-2023 Philip Kendall, Darren Salt, Fredrick Meunier
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1177,6 +1177,10 @@ libspectrum_z80_write2( libspectrum_buffer *buffer, int *out_flags,
 
   /* .z80 format doesn't save the uSource state at all */
   if( libspectrum_snap_usource_active( snap ) )
+    *out_flags |= LIBSPECTRUM_FLAG_SNAPSHOT_MAJOR_INFO_LOSS;
+
+  /* .z80 format doesn't save the uSpeech state at all */
+  if( libspectrum_snap_uspeech_active( snap ) )
     *out_flags |= LIBSPECTRUM_FLAG_SNAPSHOT_MAJOR_INFO_LOSS;
 
   /* .z80 format doesn't save the DISCiPLE state well but we don't support

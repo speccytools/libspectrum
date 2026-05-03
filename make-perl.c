@@ -1,5 +1,5 @@
 /* make-perl.c: Generate a perl script to create the libspectrum_* typedefs
-   Copyright (c) 2002-2003,2015 Philip Kendall, Darren Salt
+   Copyright (c) 2002-2003,2015,2021 Philip Kendall, Darren Salt
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -368,10 +368,13 @@ int main(void)
   printf( "#define	LIBSPECTRUM_SUPPORTS_BZ2_COMPRESSION	(1)\n\n" );
 #endif				/* #ifdef HAVE_LIBBZ2 */
 
-#ifdef HAVE_LIB_AUDIOFILE
+#ifdef HAVE_WAV_BACKEND
   printf( "\n/* we support wav files */\n" );
-  printf( "#define	LIBSPECTRUM_SUPPORTS_AUDIOFILE	(1)\n\n" );
-#endif				/* #ifdef HAVE_LIB_AUDIOFILE */
+  printf( "/* LIBSPECTRUM_SUPPORTS_AUDIOFILE is deprecated; use "
+          "LIBSPECTRUM_SUPPORTS_WAV instead. */\n" );
+  printf( "#define	LIBSPECTRUM_SUPPORTS_AUDIOFILE	(1)\n" );
+  printf( "#define	LIBSPECTRUM_SUPPORTS_WAV	(1)\n\n" );
+#endif				/* #ifdef HAVE_WAV_BACKEND */
 
   printf( "CODE\n}\n\n" );
 

@@ -256,12 +256,7 @@ find_block( gconstpointer a, gconstpointer b )
 libspectrum_rzx*
 libspectrum_rzx_alloc( void )
 {
-  libspectrum_rzx *rzx = libspectrum_new( libspectrum_rzx, 1 );
-  rzx->blocks = NULL;
-  rzx->current_block = NULL;
-  rzx->current_input = NULL;
-  rzx->signed_start = NULL;
-  return rzx;
+  return libspectrum_new0( libspectrum_rzx, 1 );
 }
 
 void

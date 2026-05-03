@@ -1,5 +1,5 @@
 # snap_accessors.txt: simple accessors for libspectrum_snap
-# Copyright (c) 2003-2016 Philip Kendall
+# Copyright (c) 2003-2023 Philip Kendall
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -240,6 +240,10 @@ int usource_paged
 int usource_custom_rom
 libspectrum_byte* usource_rom 1
 size_t usource_rom_length 1     /* Length of the ROM */
+
+/* uSpeech emulation */
+int uspeech_active
+int uspeech_paged
 
 /* DISCiPLE emulation */
 int disciple_active

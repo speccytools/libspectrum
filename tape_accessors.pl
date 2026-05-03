@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 # tape_accessors.pl: generate accessor functions for libspectrum_tape_block
-# Copyright (c) 2003 Philip Kendall
+# Copyright (c) 2003,2021 Philip Kendall
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ use strict;
 
 print << "CODE";
 /* tape_accessors.c: accessor functions for libspectrum_tape_block
-   Copyright (c) 2003 Philip Kendall
+   Copyright (c) 2003,2021 Philip Kendall
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by

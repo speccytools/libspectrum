@@ -1,7 +1,7 @@
 .\" -*- nroff -*-
 .\"
 .\" libspectrum.3: libspectrum summary
-.\" Copyright (c) 2004-2021 Philip Kendall
+.\" Copyright (c) 2004-2026 Philip Kendall
 .\"
 .\" This program is free software; you can redistribute it and/or modify
 .\" it under the terms of the GNU General Public License as published by
@@ -22,12 +22,53 @@
 .\" E-mail: philip-fuse@shadowmagic.org.uk
 .\"
 .\"
-.TH libspectrum 3 "27th February, 2021" "Version 1.5.0" "Emulators"
+.TH libspectrum 3 "9th March, 2026" "Version 1.6.0" "Emulators"
 .\"
 .\"------------------------------------------------------------------
 .\"
 .SH NAME
 libspectrum \(em Sinclair ZX Spectrum support library
+.\"
+.\"------------------------------------------------------------------
+.\"
+.SH SYNOPSIS
+.B #include <libspectrum.h>
+.PP
+.BI "libspectrum_error libspectrum_init( void );"
+.br
+.BI "void libspectrum_end( void );"
+.br
+.BI "libspectrum_error libspectrum_identify_file( libspectrum_id_t *type, const char *filename, const unsigned char *buffer, size_t length );"
+.br
+.BI "libspectrum_error libspectrum_snap_read( libspectrum_snap *snap, const libspectrum_byte *buffer, size_t length, libspectrum_id_t type, const char *filename );"
+.br
+.BI "libspectrum_error libspectrum_tape_read( libspectrum_tape *tape, const libspectrum_byte *buffer, size_t length, libspectrum_id_t type, const char *filename );"
+.br
+.BI "libspectrum_error libspectrum_rzx_read( libspectrum_rzx *rzx, const libspectrum_byte *buffer, size_t length );"
+.PP
+Additional public helper APIs are documented in
+.RI ` libspectrum.txt ',
+including the zlib helpers
+.BR libspectrum_zlib_inflate ()
+and
+.BR libspectrum_zlib_compress (),
+the allocation helper macros
+.BR libspectrum_new ,
+.BR libspectrum_new0
+and
+.BR libspectrum_renew ,
+the growable buffer API
+.BR libspectrum_buffer_alloc ()
+through
+.BR libspectrum_buffer_append (),
+RZX signature inspection helpers such as
+.BR libspectrum_rzx_get_keyid ()
+and
+.BR libspectrum_rzx_get_signature (),
+and state/query helpers such as
+.BR libspectrum_tape_state ()
+and
+.BR libspectrum_ide_dirty ().
 .\"
 .\"------------------------------------------------------------------
 .\"

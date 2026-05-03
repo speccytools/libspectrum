@@ -51,11 +51,7 @@ libspectrum_buffer_reallocate( libspectrum_buffer *buffer,
 libspectrum_buffer*
 libspectrum_buffer_alloc( void )
 {
-  libspectrum_buffer *buffer = libspectrum_new( libspectrum_buffer, 1 );
-
-  buffer->buffer = NULL;
-  buffer->buffer_size = 0;
-  buffer->bytes_used = 0;
+  libspectrum_buffer *buffer = libspectrum_new0( libspectrum_buffer, 1 );
 
   libspectrum_buffer_reallocate( buffer, 65536 );
 
@@ -95,20 +91,20 @@ void
 libspectrum_buffer_write_word( libspectrum_buffer *buffer,
                                const libspectrum_word data )
 {
-  libspectrum_word lsb_data;
-  libspectrum_byte* lsb_data_ptr = (libspectrum_byte*)&lsb_data;
-  libspectrum_write_word( &lsb_data_ptr, data );
-  libspectrum_buffer_write( buffer, &lsb_data, sizeof( libspectrum_word ) ) ;
+  libspectrum_byte lsb_data[2];
+  libspectrum_byte *ptr = lsb_data;
+  libspectrum_write_word( &ptr, data );
+  libspectrum_buffer_write( buffer, lsb_data, sizeof( lsb_data ) );
 }
 
 void
 libspectrum_buffer_write_dword( libspectrum_buffer *buffer,
                                 const libspectrum_dword data )
 {
-  libspectrum_dword lsb_data;
-  libspectrum_byte* lsb_data_ptr = (libspectrum_byte*)&lsb_data;
-  libspectrum_write_dword( &lsb_data_ptr, data );
-  libspectrum_buffer_write( buffer, &lsb_data, sizeof( libspectrum_dword ) ) ;
+  libspectrum_byte lsb_data[4];
+  libspectrum_byte *ptr = lsb_data;
+  libspectrum_write_dword( &ptr, data );
+  libspectrum_buffer_write( buffer, lsb_data, sizeof( lsb_data ) );
 }
 
 void
@@ -121,8 +117,12 @@ libspectrum_buffer_write_buffer( libspectrum_buffer *dest,
 static void
 reallocate_to_new_size( libspectrum_buffer *buffer, const size_t size )
 {
-  while ( size > buffer->buffer_size - buffer->bytes_used ) {
-    libspectrum_buffer_reallocate( buffer, 2 * buffer->buffer_size );
+  if( size > buffer->buffer_size - buffer->bytes_used ) {
+    size_t new_size = buffer->buffer_size;
+    do {
+      new_size *= 2;
+    } while( new_size - buffer->bytes_used < size );
+    libspectrum_buffer_reallocate( buffer, new_size );
   }
 }
 

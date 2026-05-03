@@ -141,7 +141,7 @@ zero_tail_edges_list[] =
 test_return_t
 test_28( void )
 {
-  return check_edges( DYNAMIC_TEST_PATH( "zero-tail.pzx" ),
+  return check_edges( STATIC_TEST_PATH( "zero-tail.pzx" ),
                       zero_tail_edges_list, 0x1ff );
 }
 
@@ -194,7 +194,7 @@ no_pilot_gdb_list[] =
 test_return_t
 test_29( void )
 {
-  return check_edges( DYNAMIC_TEST_PATH( "no-pilot-gdb.tzx" ),
+  return check_edges( STATIC_TEST_PATH( "no-pilot-gdb.tzx" ),
                       no_pilot_gdb_list, 0x1ff );
 }
 
@@ -222,7 +222,7 @@ raw_edges_list[] =
 test_return_t
 test_73( void )
 {
-  return check_edges( DYNAMIC_TEST_PATH( "raw-data-block.tzx" ),
+  return check_edges( STATIC_TEST_PATH( "raw-data-block.tzx" ),
                       raw_edges_list, 0xffff );
 }
 
@@ -256,7 +256,7 @@ trailing_pause_edges_list[] =
 test_return_t
 test_74( void )
 {
-  return check_edges( DYNAMIC_TEST_PATH( "trailing-pause-block.tzx" ),
+  return check_edges( STATIC_TEST_PATH( "trailing-pause-block.tzx" ),
                       trailing_pause_edges_list,
                       LIBSPECTRUM_TAPE_FLAGS_NO_EDGE |
                       LIBSPECTRUM_TAPE_FLAGS_LEVEL_LOW |

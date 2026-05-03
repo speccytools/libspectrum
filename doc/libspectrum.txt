@@ -1,4 +1,4 @@
-libspectrum 1.5.0
+libspectrum 1.6.0
 =================
 
 libspectrum is a fairly simple library designed to make the handling
@@ -43,8 +43,32 @@ LIBSPECTRUM_SUPPORTS_ZLIB_COMPRESSION will be defined and non-zero. If
 the library does not support zlib compression, then the constant will
 not be defined.
 
-Bzip2 compression is similarly covered by LIBSPECTRUM_SUPPORTS_BZ2_COMPRESSION
-and WAV file support is covered by LIBSPECTRUM_SUPPORTS_AUDIOFILE.
+Bzip2 compression is similarly covered by LIBSPECTRUM_SUPPORTS_BZ2_COMPRESSION.
+
+WAV file support is covered by LIBSPECTRUM_SUPPORTS_WAV.
+LIBSPECTRUM_SUPPORTS_AUDIOFILE remains defined as a deprecated compatibility
+alias for older code, but new code should use LIBSPECTRUM_SUPPORTS_WAV.
+
+Compression helpers
+===================
+
+libspectrum_error
+libspectrum_zlib_inflate( const libspectrum_byte *gzptr, size_t gzlength,
+                          libspectrum_byte **outptr, size_t *outlength )
+
+Inflate the zlib-compressed data in `gzptr' and return the uncompressed
+buffer and length in `*outptr' and `*outlength'. The returned buffer is
+allocated by libspectrum and should be released with `libspectrum_free'
+when it is no longer needed.
+
+libspectrum_error
+libspectrum_zlib_compress( const libspectrum_byte *data, size_t length,
+                           libspectrum_byte **gzptr, size_t *gzlength )
+
+Compress the `length' bytes at `data' with zlib and return the compressed
+buffer and length in `*gzptr' and `*gzlength'. The returned buffer is
+allocated by libspectrum and should be released with `libspectrum_free'
+when it is no longer needed.
 
 Defined types
 =============
@@ -69,6 +93,11 @@ This routine must be called before any other libspectrum routines,
 other than `libspectrum_version', `libspectrum_check_version' and
 `libspectrum_mem_set_vtable' to initialise the library. If it isn't
 called, undefined behaviour may result.
+
+void libspectrum_end( void )
+
+Release any global resources allocated by libspectrum. This should be
+called once the calling program has finished using the library.
 
 const char *libspectrum_version( void )
 
@@ -116,6 +145,27 @@ Note that libspectrum will ensure that the memory allocators are still
 strong, and will abort the program if any of the allocators returns
 NULL.
 
+void* libspectrum_malloc( size_t size )
+void* libspectrum_malloc_n( size_t nmemb, size_t size )
+void* libspectrum_malloc0_n( size_t nmemb, size_t size )
+void* libspectrum_realloc( void *ptr, size_t size )
+void* libspectrum_realloc_n( void *ptr, size_t nmemb, size_t size )
+void libspectrum_free( void *ptr )
+
+These are libspectrum's strong memory allocation wrappers. They use the
+currently configured allocation vtable, and will abort the program if an
+allocation fails rather than returning NULL. `libspectrum_malloc0_n'
+returns zeroed memory.
+
+#define libspectrum_new( type, count )
+#define libspectrum_new0( type, count )
+#define libspectrum_renew( type, mem, count )
+
+These convenience macros wrap `libspectrum_malloc_n',
+`libspectrum_malloc0_n' and `libspectrum_realloc_n' respectively while
+also casting the result to `type *'. `libspectrum_new0' returns zeroed
+memory.
+
 Error handling
 ==============
 
@@ -134,6 +184,7 @@ LIBSPECTRUM_ERROR_SLT		Ugly kludge used to indicate that a .z80
 				file contains .slt data
 LIBSPECTRUM_ERROR_INVALID	An invalid parameter was supplied to a
 				function
+LIBSPECTRUM_ERROR_MISSING_ZLIB	zlib support is unavailable or disabled
 LIBSPECTRUM_ERROR_LOGIC		An internal logic error has occurred;
 				should never be seen
 
@@ -153,6 +204,14 @@ create a text message giving more details on the error. If
 the message to stderr, prefixed with "libspectrum error: " and ending
 with a newline.  (Additionally, it will call abort() if the error was of
 type LIBSPECTRUM_ERROR_LOGIC, but that shouldn't happen...)
+
+libspectrum_error
+libspectrum_default_error_function( libspectrum_error error,
+                                    const char *format, va_list ap )
+
+The default implementation of `libspectrum_error_function'. Most callers
+will not need to invoke this directly, but it can be useful from a custom
+error handler which wants to preserve the standard formatting.
 
 General functions
 =================
@@ -312,6 +371,7 @@ LIBSPECTRUM_ID_SNAPSHOT_SP      A .sp snapshot
 LIBSPECTRUM_ID_SNAPSHOT_SZX     A .szx snapshot (as used by Spectaculator)
 LIBSPECTRUM_ID_SNAPSHOT_Z80	A .z80 snapshot
 LIBSPECTRUM_ID_SNAPSHOT_ZXS	A .zxs snapshot (as used by zx32)
+LIBSPECTRUM_ID_SNAPSHOT_DSNAP   A .S snapshot (as used by D40/D80)
 
 LIBSPECTRUM_ID_TAPE_CSW		A .csw tape image
 LIBSPECTRUM_ID_TAPE_TAP		A `normal' (Z80-style) .tap tape image
@@ -381,6 +441,55 @@ libspectrum_identify_file_with_class(
 simply combines the calls to `libspectrum_identify_file' and
 `libspectrum_identify_class', returning the file type in `*type' and
 the file class in `*class'.
+
+Buffer helpers
+--------------
+
+`libspectrum_buffer' is an opaque growable byte buffer used by parts of
+the library and also exposed for callers that need the same append-style
+serialisation support.
+
+libspectrum_buffer* libspectrum_buffer_alloc( void )
+void libspectrum_buffer_reallocate( libspectrum_buffer *buffer, size_t new_size )
+void libspectrum_buffer_free( libspectrum_buffer *buffer )
+
+Allocate, resize or free a buffer. Newly allocated buffers start empty.
+
+int libspectrum_buffer_is_empty( const libspectrum_buffer *buffer )
+int libspectrum_buffer_is_not_empty( const libspectrum_buffer *buffer )
+
+Return whether the buffer currently contains any data.
+
+void libspectrum_buffer_write_byte( libspectrum_buffer *buffer,
+                                    libspectrum_byte data )
+void libspectrum_buffer_write_word( libspectrum_buffer *buffer,
+                                    libspectrum_word data )
+void libspectrum_buffer_write_dword( libspectrum_buffer *buffer,
+                                     libspectrum_dword data )
+void libspectrum_buffer_write_buffer( libspectrum_buffer *dest,
+                                      const libspectrum_buffer *src )
+void libspectrum_buffer_write( libspectrum_buffer *buffer, const void *data,
+                               size_t size )
+void libspectrum_buffer_set( libspectrum_buffer *buffer,
+                             libspectrum_byte value, size_t size )
+
+Append a byte, word, dword, another buffer, arbitrary data or repeated
+bytes to `buffer'. The word and dword helpers serialise values in little-
+endian form.
+
+size_t libspectrum_buffer_get_data_size( const libspectrum_buffer *buffer )
+libspectrum_byte* libspectrum_buffer_get_data( const libspectrum_buffer *buffer )
+void libspectrum_buffer_clear( libspectrum_buffer *buffer )
+
+Return the number of bytes currently stored in `buffer', access its data,
+or reset it to the empty state.
+
+void libspectrum_buffer_append( libspectrum_byte **buffer, size_t *length,
+                                libspectrum_byte **ptr,
+                                const libspectrum_buffer *src )
+
+Append the contents of `src' to the raw output buffer identified by
+`buffer', `length' and `ptr', growing that buffer if needed.
 
 Machine timings
 ---------------
@@ -728,6 +837,9 @@ The available properties (along with their types) are:
 * libspectrum_byte* usource_rom[1]
 * size_t usource_rom_length[1]
 
+* int uspeech_active
+* int uspeech_paged
+
 * int disciple_active
 * int disciple_paged
 * int disciple_inhibit_button
@@ -834,6 +946,11 @@ be are:
   LIBSPECTRUM_JOYSTICK_TIMEX_2		Timex joystick 2
   LIBSPECTRUM_JOYSTICK_FULLER		Fuller joystick
 
+  const char* libspectrum_joystick_name( libspectrum_joystick type )
+
+  Return a statically allocated string containing the name of the
+  joystick type, or "unknown" if it is not recognised.
+
   The joystick input values can be any of:
 
   LIBSPECTRUM_JOYSTICK_INPUT_NONE	Not connected
@@ -897,7 +1014,7 @@ snapshot to specify the creator of the file. This can be NULL, in
 which case no information will be written. Currently, only the .szx
 format will make any use of this information.
 
-The only formats for which serialisation is supported are .sna, .szx
+The only formats for which serialisation is supported are .sna, .szx, .s
 and .z80.
 
 Tape functions
@@ -1066,6 +1183,11 @@ is not modified.
 
 Tape blocks
 -----------
+
+libspectrum_tape_block*
+libspectrum_tape_iterator_current( libspectrum_tape_iterator iterator )
+
+Return the block currently pointed to by `iterator'.
 
 The block format used by libspectrum is very similar to that used by
 the TZX format itself; see http://www.worldofspectrum.org/TZXformat.html
@@ -1329,6 +1451,18 @@ Exposing this parameter is an ugly hack needed by Fuse to allow for
 flash-loading of tape blocks, and setting it should not be used unless
 absolutely necessary.
 
+libspectrum_tape_state_type
+libspectrum_tape_state( libspectrum_tape *tape )
+
+Return the current playback state of the active block.
+
+libspectrum_error
+libspectrum_tape_set_state( libspectrum_tape *tape,
+                            libspectrum_tape_state_type state )
+
+Set the current playback state of the active block. This is only valid
+for block types that expose a mutable playback state.
+
 The libspectrum_tape_generalised_data_symbol_table is an opaque data
 structure which represents the "symbol table" used in the TZX
 generalised data block (ID 0x19). It can be accessed with the
@@ -1457,31 +1591,39 @@ size_t libspectrum_rzx_instructions( libspectrum_rzx *rzx )
 Return the number of opcode fetches to be performed during the current
 frame of `rzx'.
 
+libspectrum_dword libspectrum_rzx_get_keyid( libspectrum_rzx *rzx )
+
+Return the key ID from the start-of-signature block in `rzx', or zero if
+the recording is unsigned.
+
 libspectrum_error
-libspectrum_rzx_read( libspectrum_rzx *rzx, libspectrum_snap **snap,
-		      const libspectrum_byte *buffer, const size_t length,
-		      libspectrum_rzx_signature *signature )
+libspectrum_rzx_get_signature( libspectrum_rzx *rzx,
+                               libspectrum_signature *signature )
+
+Extract the signature metadata from `rzx' into `*signature'. This is
+useful after `libspectrum_rzx_read' when the caller wants to verify the
+recording's digital signature.
+
+libspectrum_error
+libspectrum_rzx_read( libspectrum_rzx *rzx, const libspectrum_byte *buffer,
+		      const size_t length )
 
 Given a .rzx file of `length' bytes starting at `buffer', extract the
-input recording data into `rzx' and the embedded snapshot into
-`*snap'. If there is no embedded snapshot, `*snap' will be NULL after
-the call. If the RZX file contains a digital signature, `*signature'
-will contain the information from that signature; see below for
-information on this. Files compressed with bzip2 or gzip will be
-automatically and transparently decompressed.
+input recording data into `rzx'. Embedded snapshots are retained within
+the recording and can be inspected via the RZX iterator functions.
+Files compressed with bzip2 or gzip will be automatically and
+transparently decompressed.
 
 libspectrum_error
 libspectrum_rzx_write( libspectrum_byte **buffer, size_t *length,
 		       libspectrum_rzx *rzx,
-		       libspectrum_byte *snap, libspectrum_id_t snap_format,
-		       libspectrum_creator *creator,
+		       libspectrum_id_t snap_format, libspectrum_creator *creator,
 		       int compress, libspectrum_rzx_dsa_key *key )
 
-Given input recording data in `rzx' and a snapshot in `snap', create a
-.rzx file in `*buffer'. If no embedded snapshot is required, set
-`snap' to be NULL. Before the call, `*buffer' should be allocated at
-least `*length' bytes (can be zero). After the call, `*length'
-contains the length of the .rzx file.
+Given input recording data in `rzx', create a .rzx file in `*buffer'.
+Before the call, `*buffer' should be allocated at least `*length' bytes
+(or `*length' can be zero). After the call, `*length' contains the
+length of the .rzx file.
 
 `snap format' specifies the format for the embedded snap. This can be
 any of the formats supported by `libspectrum_snap_write' or
@@ -1535,6 +1677,10 @@ and moved to the next block via
 libspectrum_rzx_iterator
 libspectrum_rzx_iterator_next( libspectrum_rzx_iterator it )
 
+The final block can be obtained directly with
+
+libspectrum_rzx_iterator libspectrum_rzx_iterator_last( libspectrum_rzx *rzx )
+
 The type of block pointed to by the iterator can be obtained via the
 
 libspectrum_rzx_block_id
@@ -1554,6 +1700,11 @@ then the function
 size_t libspectrum_rzx_iterator_get_frames( libspectrum_rzx_iterator it )
 
 can be used to obtain the number of frames stored in the block.
+
+libspectrum_error libspectrum_rzx_finalise( libspectrum_rzx *rzx )
+
+Finalise a recording before writing it out by deleting intermediate
+snapshot blocks and merging adjacent input blocks where possible.
 
 Digital signatures in RZX files
 -------------------------------
@@ -1599,31 +1750,25 @@ Each of the fields is one of the standard DSA parameters, stored as a
 hex string with the MSB first. `x' should be set to NULL for a public
 key.
 
-When a digitally signed RZX file is read, the signature information
-will be read into a `libspectrum_rzx_signature' structure:
+When a digitally signed RZX file is read, the signature information can
+be extracted with `libspectrum_rzx_get_signature' into a
+`libspectrum_signature' structure:
 
-typedef struct libspectrum_rzx_signature {
-
-  libspectrum_dword key_id;
+typedef struct libspectrum_signature {
 
   const libspectrum_byte *start; ptrdiff_t length;
 
-  GcryMPI r, s;
+} libspectrum_signature;
 
-} libspectrum_rzx_signature;
-
-`key_id' is the low 32-bits of the `y' parameter of the key used to
-sign this file; you'll have to implement your own lookup table to find
-the rest of the key. `start' points to the signed data, which is
-`length' bytes long. `r' and `s' are the standard DSA signature
-parameters, stored in libgcrypt's native MPI format. (If libgcrypt is
-not available, these parameters are simply not present in the
-structure).
+The key ID is available separately via `libspectrum_rzx_get_keyid'.
+`start' points to the signed data, which is `length' bytes long. If
+libgcrypt is available, the implementation also stores the signature MPI
+values in the structure.
 
 To verify a signature, simply call `libspectrum_verify_signature':
 
 libspectrum_error
-libspectrum_verify_signature( libspectrum_rzx_signature *signature,
+libspectrum_verify_signature( libspectrum_signature *signature,
 			      libspectrum_rzx_dsa_key *key )
 
 This will return LIBSPECTRUM_ERROR_NONE if the signature is valid or
@@ -1633,21 +1778,9 @@ Once you're done with a signature, `libspectrum_signature_free' will
 release the memory it was using:
 
 libspectrum_error
-libspectrum_signature_free( libspectrum_rzx_signature *signature )
+libspectrum_signature_free( libspectrum_signature *signature )
 
 Note this will not free the data pointed to by `start'.
-
-Deprecated RZX function
------------------------
-
-libspectrum_error
-libspectrum_rzx_write( libspectrum_byte **buffer, size_t *length,
-		       libspectrum_rzx *rzx,
-		       libspectrum_byte *snap, libspectrum_creator *creator,
-		       int compress, libspectrum_rzx_dsa_key *key )
-
-Exactly equivalent to libspectrum_rzx_write2( buffer, length, rzx,
-snap, LIBSPECTRUM_ID_SNAPSHOT_Z80, creator, compress, key ).
 
 Microdrive handling functions
 =============================
@@ -1806,6 +1939,13 @@ Read in a dock structure from the `length' byte long `buffer'. Images
 compressed with bzip2 or gzip will be automatically and transparently
 decompressed.
 
+libspectrum_error
+libspectrum_dck_read2( libspectrum_dck *dck, const libspectrum_byte *buffer,
+                       size_t length, const char *filename )
+
+As `libspectrum_dck_read', but also takes `filename' so that compressed
+inputs can be identified using the original name when necessary.
+
 IDE hard disk images
 ====================
 
@@ -1857,6 +1997,13 @@ libspectrum_ide_commit( libspectrum_ide_channel *chn,
 
 Cause any changes made to the image attached to `unit' of `chn' to be
 written back to the image.
+
+int
+libspectrum_ide_dirty( libspectrum_ide_channel *chn,
+		      libspectrum_ide_unit unit )
+
+Return non-zero if the image attached to `unit' has uncommitted cached
+changes waiting to be written back.
 
 libspectrum_error
 libspectrum_ide_eject( libspectrum_ide_channel *chn,

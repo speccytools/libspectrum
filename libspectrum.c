@@ -1,5 +1,5 @@
 /* libspectrum.c: Some general routines
-   Copyright (c) 2001-2015 Philip Kendall, Darren Salt, Fredrick Meunier
+   Copyright (c) 2001-2023 Philip Kendall, Darren Salt, Fredrick Meunier
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -513,6 +513,7 @@ libspectrum_identify_file_raw( libspectrum_id_t *type, const char *filename,
       /* Peter McGavin's Spectrum Emulator on the Amiga used .snapshot for sna
          snaps */
       { LIBSPECTRUM_ID_SNAPSHOT_SNA,  "snapshot", 3, NULL,	    0, 0, 0 },
+      { LIBSPECTRUM_ID_SNAPSHOT_DSNAP,  "s", 3, NULL,		    0, 0, 0 },
       { LIBSPECTRUM_ID_SNAPSHOT_SNP,  "snp", 3, NULL,		    0, 0, 0 },
       { LIBSPECTRUM_ID_SNAPSHOT_SP,   "sp",  3, "\x53\x50\0",	    0, 3, 1 },
       { LIBSPECTRUM_ID_SNAPSHOT_SZX,  "szx", 3, "ZXST",		    0, 4, 4 },
@@ -720,6 +721,7 @@ libspectrum_identify_class( libspectrum_class_t *libspectrum_class,
   case LIBSPECTRUM_ID_SNAPSHOT_SZX:
   case LIBSPECTRUM_ID_SNAPSHOT_Z80:
   case LIBSPECTRUM_ID_SNAPSHOT_ZXS:
+  case LIBSPECTRUM_ID_SNAPSHOT_DSNAP:
     *libspectrum_class = LIBSPECTRUM_CLASS_SNAPSHOT; return 0;
 
   case LIBSPECTRUM_ID_TAPE_TAP:
@@ -840,10 +842,10 @@ libspectrum_uncompress_file( unsigned char **new_buffer, size_t *new_length,
 
 #else				/* #ifdef HAVE_ZLIB_H */
 
-    libspectrum_print_error( LIBSPECTRUM_ERROR_UNKNOWN,
+    libspectrum_print_error( LIBSPECTRUM_ERROR_MISSING_ZLIB,
 			     "zlib not available to decompress gzipped file" );
     if( new_filename ) libspectrum_free( *new_filename );
-    return LIBSPECTRUM_ERROR_UNKNOWN;
+    return LIBSPECTRUM_ERROR_MISSING_ZLIB;
 
 #endif				/* #ifdef HAVE_ZLIB_H */
 

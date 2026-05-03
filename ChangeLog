@@ -1,4 +1,14 @@
-2021-??-??  Philip Kendall  <philip-fuse@shadowmagic.org.uk>
+2026-03-21  Philip Kendall  <philip-fuse@shadowmagic.org.uk>
+
+        * libspectrum 1.6.0 released.
+
+        * Add loading and saving of .S snapshot files as extracted from D40/D80
+          floppy images (Miroslav Ďurčík, Sergio Baldoví).
+
+        * Enable SZX support for Currah uSpeech (Vic Chwe).
+
+        * Add GitHub Actions CI workflows for Linux, Windows, Wii and macOS
+          builds (Miroslav Ďurčík).
 
         * Various minor bug fixes/improvements:
           * Fix PZX handling on big endian systems (Alberto Garcia).
@@ -8,6 +18,32 @@
           * Don't generate an edge for the STOP48 TZX block (Fredrick Meunier).
           * Use local include directives for config.h and libspectrum.h
             (Fredrick Meunier).
+          * Tests use libspectrum_snap_write() from public API (Sergio
+            Baldoví).
+          * Fix a compilation warning in test 72 (Fredrick Meunier).
+          * Fix function prototypes due to enum/integer mismatch (Sergio
+            Baldoví).
+          * Fix running unit tests when gzip is unavailable (Miroslav Ďurčík).
+          * Use libspectrum's memory management instead of strdup (Sergio
+            Baldoví).
+          * Remove unused variable in szx.c (Sergio Baldoví).
+          * Include strings.h for strcasecmp() in zip.c (Sergio Baldoví).
+          * Include <string.h> for strlen and memcpy in utilities.c (Fredrick
+            Meunier).
+          * Remove obsolete AC_HEADER_STDC macro; update audiofile.m4 (Sergio
+            Baldoví).
+          * Note info loss of uSpeech when writing dsnap, sna or z80 snapshots
+            (Sergio Baldoví).
+          * Fix RZX recording in competition mode (fixes bug #485) (Sergio
+            Baldoví, thanks crem).
+          * Fix core dump when writing SZX snapshots with more than 64 ZXCF
+            pages (Miroslav Ďurčík).
+          * Add LIBSPECTRUM_ERROR_MISSING_ZLIB to public error enum (Miroslav
+            Ďurčík).
+          * Add native macOS WAV support and LIBSPECTRUM_SUPPORTS_WAV,
+            replacing the deprecated LIBSPECTRUM_SUPPORTS_AUDIOFILE macro
+            (Fredrick Meunier).
+          * Fixes for GitHub Actions CI workflows (Fredrick Meunier).
 
 2021-02-27  Philip Kendall  <philip-fuse@shadowmagic.org.uk>
 
@@ -594,4 +630,3 @@
 
 	* libspectrum separated from Fuse just before the 0.5.0 release of
 	  Fuse; see Fuse's ChangeLog for changes up to this point
-
