@@ -645,7 +645,7 @@ tzx_read_generalised_data( libspectrum_tape *tape,
 
   data = libspectrum_new( libspectrum_byte, data_size );
 
-  if( end - (*ptr) < data_size ) {
+  if( (size_t)(end - (*ptr)) < data_size ) {
     libspectrum_free( data );
     libspectrum_tape_block_free( block );
     libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,

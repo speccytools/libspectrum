@@ -674,7 +674,7 @@ libspectrum_tape_block_alloc( libspectrum_tape_type type );
 LIBSPECTRUM_API libspectrum_error
 libspectrum_tape_block_free( libspectrum_tape_block *block );
 LIBSPECTRUM_API libspectrum_tape_type
-libspectrum_tape_block_type( libspectrum_tape_block *block );
+libspectrum_tape_block_type( const libspectrum_tape_block *block );
 LIBSPECTRUM_API libspectrum_error
 libspectrum_tape_block_set_type( libspectrum_tape_block *block,
 				 libspectrum_tape_type type );
@@ -685,10 +685,10 @@ libspectrum_tape_block_init( libspectrum_tape_block *block,
 
 LIBSPECTRUM_API libspectrum_error
 libspectrum_tape_block_description( char *buffer, size_t length,
-	                            libspectrum_tape_block *block );
+	                            const libspectrum_tape_block *block );
 
 LIBSPECTRUM_API int
-libspectrum_tape_block_metadata( libspectrum_tape_block *block );
+libspectrum_tape_block_metadata( const libspectrum_tape_block *block );
 
 LIBSPECTRUM_API libspectrum_dword
 libspectrum_tape_block_length( libspectrum_tape_block *block );
@@ -805,6 +805,10 @@ LIBSPECTRUM_API libspectrum_tape_generalised_data_symbol* libspectrum_tape_gener
 
 LIBSPECTRUM_API libspectrum_tape_generalised_data_symbol_edge_type libspectrum_tape_generalised_data_symbol_type( const libspectrum_tape_generalised_data_symbol *symbol );
 LIBSPECTRUM_API libspectrum_word libspectrum_tape_generalised_data_symbol_pulse( const libspectrum_tape_generalised_data_symbol *symbol, size_t which );
+
+LIBSPECTRUM_API libspectrum_error
+libspectrum_zx_string_to_utf8( char *buffer, size_t length,
+                               const libspectrum_byte *src, size_t src_length );
 
 
 /*

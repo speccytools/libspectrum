@@ -36,15 +36,7 @@ static const int DCK_PAGE_SIZE = 0x2000;
 static void
 libspectrum_dck_block_alloc( libspectrum_dck_block **dck )
 {
-  size_t i;
-
-  *dck = libspectrum_new( libspectrum_dck_block, 1 );
-
-  (*dck)->bank = LIBSPECTRUM_DCK_BANK_DOCK;
-  for( i = 0; i < 8; i++ ) {
-    (*dck)->access[i] = LIBSPECTRUM_DCK_PAGE_NULL;
-    (*dck)->pages[i] = NULL;
-  }
+  *dck = libspectrum_new0( libspectrum_dck_block, 1 );
 }
 
 /* Free all memory used by a libspectrum_dck_block structure */

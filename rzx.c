@@ -1,5 +1,5 @@
 /* rzx.c: routines for dealing with .rzx files
-   Copyright (c) 2002-2015 Philip Kendall
+   Copyright (c) 2002-2026 Philip Kendall
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -235,7 +235,7 @@ block_free( rzx_block_t *block )
 }
 
 static void
-block_free_wrapper( gpointer data, gpointer user_data )
+block_free_wrapper( gpointer data, gpointer user_data GCC_UNUSED )
 {
   block_free( data );
 }
@@ -989,6 +989,14 @@ rzx_read_input( libspectrum_rzx *rzx,
 
   /* Get the length and number of frames */
   blocklength = libspectrum_read_dword( ptr );
+  if( blocklength < 18 ) {
+    libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,
+                             "rzx_read_input: block length %lu less than the "
+                             "minimum 18 bytes",
+                             (unsigned long)blocklength );
+    libspectrum_free( rzx_block );
+    return LIBSPECTRUM_ERROR_CORRUPT;
+  }
   block->count = libspectrum_read_dword( ptr );
 
   /* Frame size is undefined, so just skip it */
@@ -1004,23 +1012,23 @@ rzx_read_input( libspectrum_rzx *rzx,
   flags = libspectrum_read_dword( ptr );
   compressed = flags & 0x02;
 
+  /* Discount the block intro */
+  blocklength -= 18;
+
+  /* Check that we've got enough data */
+  if( end - (*ptr) < (ptrdiff_t)blocklength ) {
+    libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,
+                             "rzx_read_input: not enough data in buffer" );
+    libspectrum_free( rzx_block );
+    return LIBSPECTRUM_ERROR_CORRUPT;
+  }
+
   if( compressed ) {
 
 #ifdef HAVE_ZLIB_H
 
     libspectrum_byte *data; const libspectrum_byte *data_ptr;
     size_t data_length = 0;
-
-    /* Discount the block intro */
-    blocklength -= 18;
-
-    /* Check that we've got enough compressed data */
-    if( end - (*ptr) < (ptrdiff_t)blocklength ) {
-      libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,
-			       "rzx_read_input: not enough data in buffer" );
-      libspectrum_free( rzx_block );
-      return LIBSPECTRUM_ERROR_CORRUPT;
-    }
 
     error = libspectrum_zlib_inflate( *ptr, blocklength, &data, &data_length );
     if( error != LIBSPECTRUM_ERROR_NONE ) {
@@ -1040,7 +1048,7 @@ rzx_read_input( libspectrum_rzx *rzx,
 #else				/* #ifdef HAVE_ZLIB_H */
 
     libspectrum_print_error( LIBSPECTRUM_ERROR_UNKNOWN,
-			     "rzx_read_input: zlib needed for decompression" );
+                             "rzx_read_input: zlib needed for decompression" );
     libspectrum_free( rzx_block );
     return LIBSPECTRUM_ERROR_UNKNOWN;
 
@@ -1048,8 +1056,12 @@ rzx_read_input( libspectrum_rzx *rzx,
 
   } else {			/* Data not compressed */
 
-    error = rzx_read_frames( block, ptr, end );
+    const libspectrum_byte *block_end = *ptr + blocklength;
+
+    error = rzx_read_frames( block, ptr, block_end );
     if( error ) { libspectrum_free( rzx_block ); return error; }
+
+    *ptr = block_end;
   }
 
   rzx->blocks = g_slist_append( rzx->blocks, rzx_block );
@@ -1071,7 +1083,7 @@ rzx_read_frames( input_block_t *block, const libspectrum_byte **ptr,
       libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,
 			       "rzx_read_frames: not enough data in buffer" );
       for( j=0; j<i; j++ ) {
-	if( !block->frames[i].repeat_last ) libspectrum_free( block->frames[j].in_bytes );
+	if( !block->frames[j].repeat_last ) libspectrum_free( block->frames[j].in_bytes );
       }
       return LIBSPECTRUM_ERROR_CORRUPT;
     }
@@ -1090,7 +1102,7 @@ rzx_read_frames( input_block_t *block, const libspectrum_byte **ptr,
       libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,
 			       "rzx_read_frames: not enough data in buffer" );
       for( j=0; j<i; j++ ) {
-	if( !block->frames[i].repeat_last ) libspectrum_free( block->frames[j].in_bytes );
+	if( !block->frames[j].repeat_last ) libspectrum_free( block->frames[j].in_bytes );
       }
       return LIBSPECTRUM_ERROR_CORRUPT;
     }
@@ -1312,7 +1324,7 @@ libspectrum_rzx_write( libspectrum_byte **buffer, size_t *length,
 }
 
 static void
-rzx_write_header( libspectrum_buffer *buffer, int sign )
+rzx_write_header( libspectrum_buffer *buffer, int sign GCC_UNUSED )
 {
   libspectrum_buffer_write( buffer, rzx_signature, strlen( rzx_signature ) );
 
@@ -1531,10 +1543,10 @@ rzx_write_input( input_block_t *block, libspectrum_buffer *buffer,
 }
 
 static libspectrum_error
-rzx_write_signed_start( libspectrum_buffer *buffer,
-                        libspectrum_buffer *block_data,
-                        libspectrum_rzx_dsa_key *key,
-			libspectrum_creator *creator )
+rzx_write_signed_start( libspectrum_buffer *buffer GCC_UNUSED,
+                        libspectrum_buffer *block_data GCC_UNUSED,
+                        libspectrum_rzx_dsa_key *key GCC_UNUSED,
+			libspectrum_creator *creator GCC_UNUSED )
 {
 #ifdef HAVE_GCRYPT_H
   /* Key ID */
@@ -1565,8 +1577,8 @@ rzx_write_signed_start( libspectrum_buffer *buffer,
 }
 
 static libspectrum_error
-rzx_write_signed_end( libspectrum_buffer *buffer, libspectrum_buffer *block_data,
-                      libspectrum_rzx_dsa_key *key )
+rzx_write_signed_end( libspectrum_buffer *buffer GCC_UNUSED, libspectrum_buffer *block_data GCC_UNUSED,
+                      libspectrum_rzx_dsa_key *key GCC_UNUSED )
 {
 #ifdef HAVE_GCRYPT_H
   libspectrum_error error;

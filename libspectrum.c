@@ -1,5 +1,5 @@
 /* libspectrum.c: Some general routines
-   Copyright (c) 2001-2023 Philip Kendall, Darren Salt, Fredrick Meunier
+   Copyright (c) 2001-2026 Philip Kendall, Darren Salt, Fredrick Meunier
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -287,161 +287,99 @@ const int LIBSPECTRUM_MACHINE_CAPABILITY_PENT1024_MEMORY = 1 << 15;
 int
 libspectrum_machine_capabilities( libspectrum_machine type )
 {
-  int capabilities = 0;
-
-  /* AY-3-8912 */
   switch( type ) {
-  case LIBSPECTRUM_MACHINE_128: case LIBSPECTRUM_MACHINE_PLUS2:
-  case LIBSPECTRUM_MACHINE_PLUS2A: case LIBSPECTRUM_MACHINE_PLUS3:
-  case LIBSPECTRUM_MACHINE_PLUS3E: case LIBSPECTRUM_MACHINE_128E:
-  case LIBSPECTRUM_MACHINE_TC2068: case LIBSPECTRUM_MACHINE_TS2068:
-  case LIBSPECTRUM_MACHINE_PENT:
-  case LIBSPECTRUM_MACHINE_PENT512: case LIBSPECTRUM_MACHINE_PENT1024:
-  case LIBSPECTRUM_MACHINE_SCORP:
-  case LIBSPECTRUM_MACHINE_SE:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_AY; break;
-  default:
-    break;
-  }
 
-  /* 128K Spectrum-style 0x7ffd memory paging */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_128: case LIBSPECTRUM_MACHINE_PLUS2:
-  case LIBSPECTRUM_MACHINE_PLUS2A: case LIBSPECTRUM_MACHINE_PLUS3:
-  case LIBSPECTRUM_MACHINE_PLUS3E: case LIBSPECTRUM_MACHINE_128E:
-  case LIBSPECTRUM_MACHINE_PENT:
-  case LIBSPECTRUM_MACHINE_PENT512: case LIBSPECTRUM_MACHINE_PENT1024:
-  case LIBSPECTRUM_MACHINE_SCORP:
-/* FIXME: SE needs to have this capability to be considered a 128k machine */
-  case LIBSPECTRUM_MACHINE_SE:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY; break;
-  default:
-    break;
-  }
+  case LIBSPECTRUM_MACHINE_16:
+  case LIBSPECTRUM_MACHINE_48:
+  case LIBSPECTRUM_MACHINE_UNKNOWN:
+    return 0;
 
-  /* +3 Spectrum-style 0x1ffd memory paging */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_PLUS2A: case LIBSPECTRUM_MACHINE_PLUS3:
-  case LIBSPECTRUM_MACHINE_PLUS3E: case LIBSPECTRUM_MACHINE_128E:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_PLUS3_MEMORY; break;
-  default:
-    break;
-  }
-
-  /* +3 Spectrum-style disk */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_PLUS3: case LIBSPECTRUM_MACHINE_PLUS3E:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_PLUS3_DISK; break;
-  default:
-    break;
-  }
-
-  /* T[CS]20[46]8-style 0x00fd memory paging */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_TC2048: case LIBSPECTRUM_MACHINE_TC2068:
-  case LIBSPECTRUM_MACHINE_TS2068:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY; break;
-  default:
-    break;
-  }
-
-  /* T[CS]20[46]8-style 0x00ff video mode selection */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_TC2048: case LIBSPECTRUM_MACHINE_TC2068:
-  case LIBSPECTRUM_MACHINE_TS2068: case LIBSPECTRUM_MACHINE_SE:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO; break;
-  default:
-    break;
-  }
-
-  /* Built-in TRDOS-style disk */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_PENT:
-  case LIBSPECTRUM_MACHINE_PENT512: case LIBSPECTRUM_MACHINE_PENT1024:
-  case LIBSPECTRUM_MACHINE_SCORP:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_TRDOS_DISK; break;
-  default:
-    break;
-  }
-
-  /* T[SC]2068-style cartridge port */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_TC2068: case LIBSPECTRUM_MACHINE_TS2068:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK; break;
-  default:
-    break;
-  }
-
-  /* Sinclair-style joystick ports */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_PLUS2: case LIBSPECTRUM_MACHINE_PLUS2A:
-  case LIBSPECTRUM_MACHINE_PLUS3: case LIBSPECTRUM_MACHINE_PLUS3E:
-  case LIBSPECTRUM_MACHINE_128E:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_SINCLAIR_JOYSTICK; break;
-  default:
-    break;
-  }
-
-  /* Kempston-style joystick ports */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_TC2048:
-  case LIBSPECTRUM_MACHINE_SE:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK; break;
-  default:
-    break;
-  }
-
-  /* Scorpion-style 0x1ffd memory paging */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_SCORP:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_SCORP_MEMORY; break;
-  default:
-    break;
-  }
-
-  /* M1 cycles forced to start on even tstates */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_SCORP:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_EVEN_M1; break;
-  default:
-    break;
-  }
-
-  /* SE-style 0x7ffd and 0x00fd memory paging */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_SE:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_SE_MEMORY; break;
-  default:
-    break;
-  }
-
-  /* NTSC display */
-  switch( type ) {
   case LIBSPECTRUM_MACHINE_48_NTSC:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_NTSC;
+
+  case LIBSPECTRUM_MACHINE_TC2048:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY   |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO    |
+           LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK;
+
+  case LIBSPECTRUM_MACHINE_TC2068:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY   |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO    |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK;
+
   case LIBSPECTRUM_MACHINE_TS2068:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_NTSC; break;
-  default:
-    break;
-  }
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY   |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO    |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_NTSC;
 
-  /* Pentagon 512-style memory paging */
-  switch( type ) {
+  case LIBSPECTRUM_MACHINE_128:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
+           LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY;
+
+  case LIBSPECTRUM_MACHINE_128E:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
+           LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_PLUS3_MEMORY   |
+           LIBSPECTRUM_MACHINE_CAPABILITY_SINCLAIR_JOYSTICK;
+
+  case LIBSPECTRUM_MACHINE_PLUS2:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
+           LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_SINCLAIR_JOYSTICK;
+
+  case LIBSPECTRUM_MACHINE_PLUS2A:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
+           LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_PLUS3_MEMORY   |
+           LIBSPECTRUM_MACHINE_CAPABILITY_SINCLAIR_JOYSTICK;
+
+  case LIBSPECTRUM_MACHINE_PLUS3:
+  case LIBSPECTRUM_MACHINE_PLUS3E:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
+           LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_PLUS3_MEMORY   |
+           LIBSPECTRUM_MACHINE_CAPABILITY_PLUS3_DISK     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_SINCLAIR_JOYSTICK;
+
+  case LIBSPECTRUM_MACHINE_PENT:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
+           LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TRDOS_DISK;
+
   case LIBSPECTRUM_MACHINE_PENT512:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
+           LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TRDOS_DISK     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_PENT512_MEMORY;
+
   case LIBSPECTRUM_MACHINE_PENT1024:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_PENT512_MEMORY; break;
-  default:
-    break;
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
+           LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TRDOS_DISK     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_PENT512_MEMORY |
+           LIBSPECTRUM_MACHINE_CAPABILITY_PENT1024_MEMORY;
+
+  case LIBSPECTRUM_MACHINE_SCORP:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
+           LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TRDOS_DISK     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_SCORP_MEMORY   |
+           LIBSPECTRUM_MACHINE_CAPABILITY_EVEN_M1;
+
+  case LIBSPECTRUM_MACHINE_SE:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_AY                |
+    /* FIXME: SE needs to have this capability to be considered a 128k machine */
+           LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY        |
+           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO       |
+           LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK |
+           LIBSPECTRUM_MACHINE_CAPABILITY_SE_MEMORY;
+
   }
 
-  /* Pentagon 1024-style memory paging */
-  switch( type ) {
-  case LIBSPECTRUM_MACHINE_PENT1024:
-    capabilities |= LIBSPECTRUM_MACHINE_CAPABILITY_PENT1024_MEMORY; break;
-  default:
-    break;
-  }
-
-  return capabilities;
+  return 0;
 }
 
 /* Given a buffer and optionally a filename, make a best guess as to
@@ -504,8 +442,7 @@ libspectrum_identify_file_raw( libspectrum_id_t *type, const char *filename,
     const char *signature; size_t offset, length; int sig_score;
   };
 
-  struct type *ptr,
-    types[] = {
+  static const struct type types[] = {
       
       { LIBSPECTRUM_ID_RECORDING_RZX, "rzx", 3, "RZX!",		    0, 4, 4 },
 
@@ -576,6 +513,7 @@ libspectrum_identify_file_raw( libspectrum_id_t *type, const char *filename,
 
     };
 
+  const struct type *ptr;
   const char *extension = NULL;
   int score, best_score, best_guess, duplicate_best;
 

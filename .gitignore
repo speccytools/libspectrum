@@ -1,6 +1,8 @@
 *~
 /aclocal.m4
 /autom4te.cache
+/abi-out
+/abi-work
 /compile
 /config.cache
 /config.guess

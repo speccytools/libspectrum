@@ -80,7 +80,7 @@ jobs:
           echo "Use lib libaudiofile: ${{ inputs.use_libaudiofile && 'yes' || 'no' }}"
 
       - name: (2) Check out repository code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.LIBSPECTRUM_REPO }}
           ref: ${{ env.LIBSPECTRUM_BRANCH }}
@@ -92,10 +92,12 @@ jobs:
         with:
           path: |
             C:\cygwin-packages
-          key: cygwin-packages-libspectrum-1
+          key: cygwin-packages-libspectrum-${{ hashFiles('.github/workflows/build_windows_sub.yml') }}
+          restore-keys: |
+            cygwin-packages-libspectrum-
 
       - name: (4) Install Cygwin (32 bit) with libs
-        uses: cygwin/cygwin-install-action@master
+        uses: cygwin/cygwin-install-action@v6
         with:
           platform: x86
           packages: |
@@ -130,7 +132,7 @@ jobs:
         with:
           path: |
             C:\cygwin-packages
-          key: cygwin-packages-libspectrum-1
+          key: cygwin-packages-libspectrum-${{ hashFiles('.github/workflows/build_windows_sub.yml') }}
 
       - name: (6) Autogen.sh
         run: |
@@ -228,7 +230,7 @@ jobs:
           -C /usr/local/i686-w64-mingw32/ .
 
       - name: (15) Upload generated tar file
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with: 
           name: libspectrum-installed-windows-${{ inputs.key }}
           path: |

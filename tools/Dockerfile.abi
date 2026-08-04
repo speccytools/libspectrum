@@ -1,0 +1,19 @@
+FROM debian:12
+
+RUN apt-get update && apt-get install -y \
+    abi-compliance-checker \
+    abi-dumper \
+    autoconf \
+    automake \
+    build-essential \
+    file \
+    git \
+    libbz2-dev \
+    libtool \
+    pkg-config \
+    perl \
+    universal-ctags \
+    zlib1g-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work

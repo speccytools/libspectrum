@@ -1,5 +1,5 @@
 /* pzx_read.c: Routines for reading .pzx files
-   Copyright (c) 2001, 2002, 2021 Philip Kendall, Darren Salt
+   Copyright (c) 2001, 2002, 2021, 2026 Philip Kendall, Darren Salt
    Copyright (c) 2011-2021 Fredrick Meunier
 
    This program is free software; you can redistribute it and/or modify
@@ -116,8 +116,8 @@ get_id_byte( char *info_tag ) {
 
 static libspectrum_error
 read_pzxt_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
-                 const libspectrum_byte *end, size_t data_length,
-                 pzx_context *ctx )
+                 const libspectrum_byte *end GCC_UNUSED, size_t data_length,
+                 pzx_context *ctx GCC_UNUSED )
 {
   libspectrum_error error;
 
@@ -156,9 +156,12 @@ read_pzxt_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
     ids[0] = 0x00;
 
     /* Read in the title string itself */
+    strings[0] = NULL;
     error = pzx_read_string( buffer, block_end, &strings[0] );
     if( error ) {
       libspectrum_free( strings[0] );
+      libspectrum_free( strings );
+      libspectrum_free( ids );
       return error;
     }
   }
@@ -167,7 +170,7 @@ read_pzxt_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
     error = pzx_read_string( buffer, block_end, &info_tag );
     if( error ) {
       size_t j;
-      for( j = 0; j < i; j++ ) libspectrum_free( strings[j] );
+      for( j = 0; j < count; j++ ) libspectrum_free( strings[j] );
       libspectrum_free( strings ); libspectrum_free( ids );
       return error;
     }
@@ -179,7 +182,8 @@ read_pzxt_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
     error = pzx_read_string( buffer, block_end, &string );
     if( error ) {
       size_t j;
-      for( j = 0; j < i; j++ ) libspectrum_free( strings[j] );
+      libspectrum_free( info_tag );
+      for( j = 0; j < count; j++ ) libspectrum_free( strings[j] );
       libspectrum_free( strings ); libspectrum_free( ids );
       return error;
     }
@@ -221,8 +225,8 @@ read_pzxt_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
 
 static libspectrum_error
 read_data_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
-                 const libspectrum_byte *end, size_t data_length,
-                 pzx_context *ctx )
+                 const libspectrum_byte *end GCC_UNUSED, size_t data_length,
+                 pzx_context *ctx GCC_UNUSED )
 {
   const libspectrum_byte *block_end = *buffer + data_length;
   libspectrum_tape_block* block;
@@ -255,14 +259,14 @@ read_data_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
   count_bytes = libspectrum_bits_to_bytes( count );
   bits_in_last_byte =
     count % LIBSPECTRUM_BITS_IN_BYTE ?
-      count % LIBSPECTRUM_BITS_IN_BYTE : LIBSPECTRUM_BITS_IN_BYTE;
+      count % LIBSPECTRUM_BITS_IN_BYTE : (libspectrum_dword)LIBSPECTRUM_BITS_IN_BYTE;
   tail = libspectrum_read_word( buffer );
   p0_count = **buffer; (*buffer)++;
   p1_count = **buffer; (*buffer)++;
 
   /* need to confirm that we have enough length left for the pulse definitions
    */
-  if( data_length < 8 + 2*(p0_count + p1_count) ) {
+  if( data_length < (size_t)(8 + 2*(p0_count + p1_count)) ) {
     libspectrum_print_error(
       LIBSPECTRUM_ERROR_CORRUPT,
       "read_data_block: not enough data in buffer"
@@ -338,8 +342,8 @@ pzx_corrupt:
 
 static libspectrum_error
 read_puls_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
-                 const libspectrum_byte *end, size_t data_length,
-                 pzx_context *ctx )
+                 const libspectrum_byte *end GCC_UNUSED, size_t data_length,
+                 pzx_context *ctx GCC_UNUSED )
 {
   size_t count = 0;
   size_t pulse_repeats;
@@ -375,6 +379,8 @@ read_puls_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
   if( count == 0 ) {
     libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,
                            "read_puls_block: no pulses found in pulse block" );
+    libspectrum_free( pulse_repeats_buffer );
+    libspectrum_free( lengths_buffer );
     return LIBSPECTRUM_ERROR_CORRUPT;
   }
 
@@ -399,8 +405,8 @@ read_puls_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
 
 static libspectrum_error
 read_paus_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
-                 const libspectrum_byte *end, size_t data_length,
-                 pzx_context *ctx )
+                 const libspectrum_byte *end GCC_UNUSED, size_t data_length,
+                 pzx_context *ctx GCC_UNUSED )
 {
   libspectrum_tape_block *block;
   libspectrum_dword pause_tstates;
@@ -431,8 +437,8 @@ read_paus_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
 
 static libspectrum_error
 read_brws_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
-                 const libspectrum_byte *end, size_t data_length,
-                 pzx_context *ctx )
+                 const libspectrum_byte *end GCC_UNUSED, size_t data_length,
+                 pzx_context *ctx GCC_UNUSED )
 {
   libspectrum_tape_block* block;
   char *text;
@@ -452,8 +458,8 @@ read_brws_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
 
 static libspectrum_error
 read_stop_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
-                 const libspectrum_byte *end, size_t data_length,
-                 pzx_context *ctx )
+                 const libspectrum_byte *end GCC_UNUSED, size_t data_length,
+                 pzx_context *ctx GCC_UNUSED )
 {
   libspectrum_tape_block *block;
   libspectrum_word flags;
@@ -647,33 +653,24 @@ static libspectrum_error
 pzx_read_string( const libspectrum_byte **ptr, const libspectrum_byte *end,
 		 char **dest )
 {
-  size_t length = 0;
+  const libspectrum_byte *nul;
+  size_t length;
   char *ptr2;
-  size_t buffer_size = 64;
-  char *buffer = libspectrum_new( char, buffer_size );
 
-  while( **ptr != '\0' && *ptr < end ) {
-    if( length == buffer_size ) {
-      buffer_size *= 2;
-      buffer = libspectrum_renew( char, buffer, buffer_size );
-    }
-    *(buffer + length++) = **ptr; (*ptr)++;
-  }
+  /* Locate the NUL terminator within the available data; if absent, treat
+     end-of-block as the string boundary */
+  nul = memchr( *ptr, '\0', end - *ptr );
+  length = nul ? (size_t)(nul - *ptr) : (size_t)(end - *ptr);
 
-  /* Advance past the null terminator */
-  if( *ptr < end && **ptr == '\0' ) (*ptr)++;
-
-  *dest = libspectrum_new( char, (length + 1) );
-
-  strncpy( *dest, buffer, length );
-
-  /* Null terminate the string */
+  *dest = libspectrum_new( char, length + 1 );
+  memcpy( *dest, *ptr, length );
   (*dest)[length] = '\0';
 
-  /* Translate line endings */
-  for( ptr2 = (*dest); *ptr2; ptr2++ ) if( *ptr2 == '\r' ) *ptr2 = '\n';
+  /* Advance past the string and its NUL terminator */
+  *ptr = nul ? nul + 1 : end;
 
-  libspectrum_free( buffer );
+  /* Translate line endings */
+  for( ptr2 = *dest; *ptr2; ptr2++ ) if( *ptr2 == '\r' ) *ptr2 = '\n';
 
   return LIBSPECTRUM_ERROR_NONE;
 }

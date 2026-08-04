@@ -33,6 +33,54 @@
 
 static const libspectrum_dword tstates_per_ms = TZX_HZ / 1000;
 
+static const char *spectrum_tokens[] = {
+  "SPECTRUM",
+  "PLAY",      "RND",       "INKEY$",    "PI",
+  "FN",        "POINT",     "SCREEN$",   "ATTR",
+  "AT",        "TAB",       "VAL$",      "CODE",
+  "VAL",       "LEN",       "SIN",       "COS",
+  "TAN",       "ASN",       "ACS",       "ATN",
+  "LN",        "EXP",       "INT",       "SQR",
+  "SGN",       "ABS",       "PEEK",      "IN",
+  "USR",       "STR$",      "CHR$",      "NOT",
+  "BIN",       "OR",        "AND",       "<=",
+  ">=",        "<>",        "LINE",      "THEN",
+  "TO",        "STEP",      "DEF FN",    "CAT",
+  "FORMAT",    "MOVE",      "ERASE",     "OPEN #",
+  "CLOSE #",   "MERGE",     "VERIFY",    "BEEP",
+  "CIRCLE",    "INK",       "PAPER",     "FLASH",
+  "BRIGHT",    "INVERSE",   "OVER",      "OUT",
+  "LPRINT",    "LLIST",     "STOP",      "READ",
+  "DATA",      "RESTORE",   "NEW",       "BORDER",
+  "CONTINUE",  "DIM",       "REM",       "FOR",
+  "GO TO",     "GO SUB",    "INPUT",     "LOAD",
+  "LIST",      "LET",       "PAUSE",     "NEXT",
+  "POKE",      "PRINT",     "PLOT",      "RUN",
+  "SAVE",      "RANDOMIZE", "IF",        "CLS",
+  "DRAW",      "CLEAR",     "RETURN",    "COPY"
+};
+
+static const char *graphics_tokens[] = {
+  "\\  ", "\\ '", "\\' ", "\\''",
+  "\\ .", "\\ :", "\\'.", "\\':",
+  "\\. ", "\\.'", "\\: ", "\\:'",
+  "\\..", "\\.:", "\\:.", "\\::"
+};
+
+static libspectrum_error
+append_bytes( char **ptr, size_t *remaining, const char *text )
+{
+  size_t length = strlen( text );
+
+  if( length >= *remaining ) return LIBSPECTRUM_ERROR_INVALID;
+
+  memcpy( *ptr, text, length );
+  *ptr += length;
+  *remaining -= length;
+
+  return LIBSPECTRUM_ERROR_NONE;
+}
+
 libspectrum_dword 
 libspectrum_ms_to_tstates( libspectrum_dword ms )
 {
@@ -67,6 +115,74 @@ size_t
 libspectrum_bits_to_bytes( size_t bits )
 {
   return ( bits + LIBSPECTRUM_BITS_IN_BYTE - 1 ) / LIBSPECTRUM_BITS_IN_BYTE;
+}
+
+libspectrum_error
+libspectrum_zx_string_to_utf8( char *buffer, size_t length,
+                               const libspectrum_byte *src, size_t src_length )
+{
+  char *ptr;
+  const char *text;
+  size_t end, i, remaining;
+  libspectrum_byte b;
+  char udg[3] = "\\a";
+  char ascii[2] = " ";
+
+  if( !buffer || !length || !src ) return LIBSPECTRUM_ERROR_INVALID;
+
+  buffer[0] = '\0';
+  ptr = buffer;
+  remaining = length;
+
+  end = src_length;
+  while( end > 0 && src[ end - 1 ] == ' ' ) end--;
+
+  for( i = 0; i < end; i++ ) {
+    b = src[ i ];
+
+    switch( b ) {
+    case '\\':
+      text = "\\\\";
+      break;
+
+    case '^':
+      text = "↑";
+      break;
+
+    case '`':
+      text = "£";
+      break;
+
+    case 127:
+      text = "©";
+      break;
+
+    default:
+      if( b >= 32 && b < 127 ) {
+        ascii[0] = b;
+        text = ascii;
+      } else if( b >= 128 && b <= 143 ) {
+        text = graphics_tokens[ b - 128 ];
+      } else if( b >= 144 && b <= 164 ) {
+        udg[1] = 'a' + b - 144;
+        text = udg;
+      } else if( b >= 165 ) {
+        text = spectrum_tokens[ b - 165 ];
+      } else {
+        text = "?";
+      }
+      break;
+    }
+
+    if( append_bytes( &ptr, &remaining, text ) ) {
+      *ptr = '\0';
+      return LIBSPECTRUM_ERROR_INVALID;
+    }
+  }
+
+  *ptr = '\0';
+
+  return LIBSPECTRUM_ERROR_NONE;
 }
 
 char*

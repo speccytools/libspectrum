@@ -1,7 +1,7 @@
 #include "test.h"
 
 static test_edge_sequence_t
-complete_edges_list[] = 
+complete_edges_list[] =
 {
   /* Standard speed data block */
   { 2168, 3223, 0 },	/* Pilot */
@@ -113,7 +113,7 @@ complete_edges_list[] =
 };
 
 test_return_t
-test_15( void )
+complete_tzx_file( void )
 {
   return check_edges( DYNAMIC_TEST_PATH( "complete-tzx.tzx" ), complete_edges_list,
 		      LIBSPECTRUM_TAPE_FLAGS_STOP |
@@ -122,7 +122,7 @@ test_15( void )
 }
 
 static test_edge_sequence_t
-zero_tail_edges_list[] = 
+zero_tail_edges_list[] =
 {
   /* Data block with 0 tail */
   {  855,   1,  96 },	/* Data short pulse 1 high */
@@ -139,14 +139,14 @@ zero_tail_edges_list[] =
 };
 
 test_return_t
-test_28( void )
+zero_tail_length_pzx_file( void )
 {
   return check_edges( STATIC_TEST_PATH( "zero-tail.pzx" ),
                       zero_tail_edges_list, 0x1ff );
 }
 
 static test_edge_sequence_t
-no_pilot_gdb_list[] = 
+no_pilot_gdb_list[] =
 {
   /* Set signal level block */
   {    0,   1,  17 },	/* Set signal level low, end of block */
@@ -192,7 +192,7 @@ no_pilot_gdb_list[] =
 };
 
 test_return_t
-test_29( void )
+no_pilot_pulse_gdb_tzx_file( void )
 {
   return check_edges( STATIC_TEST_PATH( "no-pilot-gdb.tzx" ),
                       no_pilot_gdb_list, 0x1ff );
@@ -217,10 +217,10 @@ raw_edges_list[] =
 };
 
 /* Test for bugs #369: TZX raw block last edge handling, #444: Spurious
-   pulse at the beginning of a raw data block and #445 "Used bits in last 
+   pulse at the beginning of a raw data block and #445 "Used bits in last
    byte" takes the LSB in raw data blocks*/
 test_return_t
-test_73( void )
+read_tzx_raw_block_edge_handling( void )
 {
   return check_edges( STATIC_TEST_PATH( "raw-data-block.tzx" ),
                       raw_edges_list, 0xffff );
@@ -230,7 +230,8 @@ static test_edge_sequence_t
 trailing_pause_edges_list[] =
 {
   /* Standard speed data block */
-  { 2168, 3223,  0 },	/* Pilot */
+  { 2168,    1, 16 },	/* First pilot edge; TZX playback starts low */
+  { 2168, 3222,  0 },	/* Remaining pilot edges */
   {  667,    1,  0 },	/* Sync 1 */
   {  735,    1,  0 },	/* Sync 2 */
 
@@ -254,7 +255,7 @@ trailing_pause_edges_list[] =
 };
 
 test_return_t
-test_74( void )
+trailing_pause_block_tzx_file( void )
 {
   return check_edges( STATIC_TEST_PATH( "trailing-pause-block.tzx" ),
                       trailing_pause_edges_list,

@@ -210,7 +210,7 @@ get_next_block( size_t *offset, const libspectrum_byte *buffer,
   libspectrum_dword next_block;
 
   /* Check we have enough data */
-  if( end - buffer < *offset || end - buffer - *offset < 8 ) {
+  if( (size_t)(end - buffer) < *offset || (size_t)(end - buffer) - *offset < 8 ) {
     libspectrum_print_error(
       LIBSPECTRUM_ERROR_CORRUPT,
       "libspectrum_warajevo_read: not enough data in buffer"
@@ -270,7 +270,7 @@ static libspectrum_error
 execute_copy_command( libspectrum_byte *dest, const libspectrum_byte *end,
                       size_t *bytes_written )
 {
-  if( ( (*bytes_written + 1) < command.offset ) ||
+  if( ( (*bytes_written + 1) < (size_t)command.offset ) ||
       ( dest + *bytes_written - command.offset + 1 + command.size > end ) ) {
     libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,
                      "execute_copy_command: corrupt compressed block in file" );
