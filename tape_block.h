@@ -1,5 +1,5 @@
 /* tape_block.h: individual tape block types
-   Copyright (c) 2003-2008 Philip Kendall
+   Copyright (c) 2003-2026 Philip Kendall
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -238,7 +238,7 @@ typedef struct libspectrum_tape_pause_block {
 
   libspectrum_dword length;
   libspectrum_dword length_tstates;
-  int level; /* 0/1 for low and high, anything else for not specified */
+  int level; /* 0/1 for low and high, -1 for not specified */
 
 } libspectrum_tape_pause_block;
 
@@ -478,6 +478,9 @@ struct libspectrum_tape_block_state {
   GSList* loop_block;
   size_t loop_count;
 
+  /* If true then this block should start with the pulse level set to low */
+  int force_low_level;
+
   union {
     libspectrum_tape_rom_block_state rom;
     libspectrum_tape_turbo_block_state turbo;
@@ -494,6 +497,14 @@ struct libspectrum_tape_block_state {
 
 };
 
+typedef enum end_of_block_t {
+  END_OF_BLOCK_NONE,      /* End of block not reached yet */
+  END_OF_BLOCK_NORMAL,    /* End of block */
+  END_OF_BLOCK_NEXT_LOW   /* End of block; the next one starts with the
+                             pulse level set to low. This can happen
+                             if the current block ends with a pause. */
+} end_of_block_t;
+
 /* Functions needed by both tape.c and tape_block.c */
 libspectrum_error
 libspectrum_tape_pure_data_next_bit( libspectrum_tape_pure_data_block *block,
@@ -507,8 +518,8 @@ get_generalised_data_symbol( libspectrum_tape_generalised_data_block *block,
 libspectrum_error
 generalised_data_edge( libspectrum_tape_generalised_data_block *block,
                        libspectrum_tape_generalised_data_block_state *state,
-		       libspectrum_dword *tstates, int *end_of_block,
-		       int *flags );
+		       libspectrum_dword *tstates,
+		       end_of_block_t *end_of_block, int *flags );
 libspectrum_error
 libspectrum_tape_data_block_next_bit( libspectrum_tape_data_block *block,
                                     libspectrum_tape_data_block_state *state );

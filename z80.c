@@ -1,5 +1,5 @@
 /* z80.c: Routines for handling .z80 snapshots
-   Copyright (c) 2001-2023 Philip Kendall, Darren Salt, Fredrick Meunier
+   Copyright (c) 2001-2026 Philip Kendall, Darren Salt, Fredrick Meunier
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1523,7 +1523,8 @@ write_extended_header( libspectrum_buffer *buffer, int *flags,
     libspectrum_buffer_write_word( buffer, if2_left_u );
     libspectrum_buffer_write_word( buffer, if2_left_f );
   } else {
-    for( i=0; i<20; i++ ) libspectrum_buffer_write_byte( buffer, '\0' );
+    static const libspectrum_byte zeros[20] = { 0 };
+    libspectrum_buffer_write( buffer, zeros, sizeof( zeros ) );
   }
 
   /* MGT type */
@@ -1532,7 +1533,8 @@ write_extended_header( libspectrum_buffer *buffer, int *flags,
     libspectrum_buffer_write_byte( buffer, 0x00 ); /* DISCiPLE inhibitor */
     libspectrum_buffer_write_byte( buffer, 0x00 ); /* DISCiPLE pageable */
   } else {
-    for( i=52; i<55; i++ ) libspectrum_buffer_write_byte( buffer, '\0' );
+    static const libspectrum_byte zeros[3] = { 0 };
+    libspectrum_buffer_write( buffer, zeros, sizeof( zeros ) );
   }
 
   if( second_memory_port ) {

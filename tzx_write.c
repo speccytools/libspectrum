@@ -1,5 +1,5 @@
 /* tzx_write.c: Routines for writing .tzx files
-   Copyright (c) 2001-2007 Philip Kendall, Fredrick Meunier
+   Copyright (c) 2001-2026 Philip Kendall, Fredrick Meunier
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -764,7 +764,7 @@ tzx_write_rle( libspectrum_tape_block *block, libspectrum_buffer *buffer,
 
 static void
 add_pulses_block( size_t pulse_count, libspectrum_dword *lengths,
-                  libspectrum_tape_block *block, libspectrum_buffer *buffer )
+                  libspectrum_tape_block *block GCC_UNUSED, libspectrum_buffer *buffer )
 {
   libspectrum_tape_block *pulses = 
               libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PULSES );
@@ -805,6 +805,15 @@ tzx_write_pulse_sequence( libspectrum_tape_block *block, libspectrum_buffer *buf
                            libspectrum_tape_block_pulse_lengths( block, i ),
                            pulse_repeats );
     } else {
+      /* The TZX ID 0x13 (Pulse sequence) block stores its count as a single
+         byte (0-255).  Flush any accumulated pulses before the 256th entry
+         so that every PULSES block we emit has a valid count. */
+      if( uncommitted_pulse_count == 255 ) {
+        add_pulses_block( uncommitted_pulse_count, lengths, block, buffer );
+        uncommitted_pulse_count = 0;
+        max_pulse_count = 0;
+        lengths = NULL;
+      }
       if( uncommitted_pulse_count == max_pulse_count ) {
         max_pulse_count = uncommitted_pulse_count + 64;
         lengths =
@@ -932,12 +941,23 @@ tzx_write_bytes( libspectrum_buffer* buffer, size_t length, size_t length_bytes,
 static void
 tzx_write_string( libspectrum_buffer *buffer, char *string )
 {
-  size_t i, length = strlen( (char*)string );
+  size_t length = strlen( (char*)string ) & 0xff;
+  const char *p = string;
+  const char *end = string + length;
+  const char *segment = p;
 
-  length &= 0xff;
   libspectrum_buffer_write_byte( buffer, length );
 
-  /* Fix up line endings as we go */
-  for( i=0; i<length; i++ )
-    libspectrum_buffer_write_byte( buffer, string[i] == '\x0a' ? '\x0d' : string[i] );
+  /* Write bulk segments between line-ending translations (\n -> \r).
+     TZX strings rarely contain newlines, so the common case is one
+     single libspectrum_buffer_write call for the whole string. */
+  while( p < end ) {
+    if( *p == '\x0a' ) {
+      libspectrum_buffer_write( buffer, segment, p - segment );
+      libspectrum_buffer_write_byte( buffer, '\x0d' );
+      segment = p + 1;
+    }
+    p++;
+  }
+  libspectrum_buffer_write( buffer, segment, p - segment );
 }

@@ -222,3 +222,16 @@ libspectrum_split_to_48k_pages( libspectrum_snap *snap,
 
   return LIBSPECTRUM_ERROR_NONE;
 }
+
+/* Write one 16KB RAM page to a buffer; fills with 0xff if the page is absent */
+void
+libspectrum_write_snap_page( libspectrum_buffer *buffer,
+                             libspectrum_snap *snap, int page )
+{
+  libspectrum_byte *ram = libspectrum_snap_pages( snap, page );
+  if( ram ) {
+    libspectrum_buffer_write( buffer, ram, 0x4000 );
+  } else {
+    libspectrum_buffer_set( buffer, 0xff, 0x4000 );
+  }
+}

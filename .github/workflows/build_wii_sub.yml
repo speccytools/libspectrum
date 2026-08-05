@@ -80,7 +80,7 @@ jobs:
           echo ""
 
       - name: (2) Check out repository code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.LIBSPECTRUM_REPO }}
           ref: ${{ env.LIBSPECTRUM_BRANCH }}
@@ -169,7 +169,7 @@ jobs:
           -C /opt/devkitpro/devkitPPC/ -T.tar_files
 
       - name: (15) Upload generated tar file
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with: 
           name: libspectrum-installed-wii-${{ inputs.key }}
           path: |

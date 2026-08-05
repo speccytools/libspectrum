@@ -194,15 +194,15 @@ GSList* g_slist_prepend		(GSList		*list,
 }
 
 static
-gint	first_function		(gconstpointer	 a,
-				 gconstpointer	 b) {
+gint	first_function		(gconstpointer	 a GCC_UNUSED,
+				 gconstpointer	 b GCC_UNUSED) {
 
   return -1;
 }
 
 static
-gint	last_function		(gconstpointer	 a,
-				 gconstpointer	 b) {
+gint	last_function		(gconstpointer	 a GCC_UNUSED,
+				 gconstpointer	 b GCC_UNUSED) {
 
   return 1;
 }

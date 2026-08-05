@@ -174,7 +174,7 @@ internal_tap_write( libspectrum_buffer *buffer, libspectrum_tape *tape,
     case LIBSPECTRUM_TAPE_BLOCK_PULSE_SEQUENCE:
     case LIBSPECTRUM_TAPE_BLOCK_DATA_BLOCK:
       error = skip_block( block, "conversion almost certainly won't work" );
-      if( error != LIBSPECTRUM_ERROR_NONE ) { return 1; }
+      if( error != LIBSPECTRUM_ERROR_NONE ) { return error; }
       done = 1;
       break;
 
@@ -183,7 +183,7 @@ internal_tap_write( libspectrum_buffer *buffer, libspectrum_tape *tape,
     case LIBSPECTRUM_TAPE_BLOCK_SELECT:
     case LIBSPECTRUM_TAPE_BLOCK_SET_SIGNAL_LEVEL:
       error = skip_block( block, "conversion may not work" );
-      if( error != LIBSPECTRUM_ERROR_NONE ) { return 1; }
+      if( error != LIBSPECTRUM_ERROR_NONE ) { return error; }
       done = 1;
       break;
 
@@ -197,7 +197,7 @@ internal_tap_write( libspectrum_buffer *buffer, libspectrum_tape *tape,
     case LIBSPECTRUM_TAPE_BLOCK_CUSTOM:
     case LIBSPECTRUM_TAPE_BLOCK_CONCAT:
       error = skip_block( block, NULL );
-      if( error != LIBSPECTRUM_ERROR_NONE ) { return 1; }
+      if( error != LIBSPECTRUM_ERROR_NONE ) { return error; }
       done = 1;
       break;
     }
@@ -220,51 +220,34 @@ static libspectrum_error
 write_rom( libspectrum_tape_block *block, libspectrum_buffer *buffer,
 	   libspectrum_id_t type )
 {
-  libspectrum_error error;
-
-  error = write_tap_block( buffer, libspectrum_tape_block_data( block ),
-			   libspectrum_tape_block_data_length( block ), type );
-  if( error != LIBSPECTRUM_ERROR_NONE ) return error;
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return write_tap_block( buffer, libspectrum_tape_block_data( block ),
+			  libspectrum_tape_block_data_length( block ), type );
 }
 
 static libspectrum_error
 write_turbo( libspectrum_tape_block *block, libspectrum_buffer *buffer,
              libspectrum_id_t type )
 {
-  libspectrum_error error;
-
-  /* Print out a warning about converting a turbo block */
   libspectrum_print_error(
     LIBSPECTRUM_ERROR_WARNING,
     "write_turbo: converting Turbo Speed Data Block (ID 0x11); conversion may well not work"
   );
 
-  error = write_tap_block( buffer, libspectrum_tape_block_data( block ),
-			   libspectrum_tape_block_data_length( block ), type );
-  if( error != LIBSPECTRUM_ERROR_NONE ) return error;
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return write_tap_block( buffer, libspectrum_tape_block_data( block ),
+			  libspectrum_tape_block_data_length( block ), type );
 }
 
 static libspectrum_error
 write_pure_data( libspectrum_tape_block *block, libspectrum_buffer *buffer,
 		 libspectrum_id_t type )
 {
-  libspectrum_error error;
-
-  /* Print out a warning about converting a pure data block */
   libspectrum_print_error(
     LIBSPECTRUM_ERROR_WARNING,
     "write_pure_data: converting Pure Data Block (ID 0x14); conversion almost certainly won't work"
   );
 
-  error = write_tap_block( buffer, libspectrum_tape_block_data( block ),
-			   libspectrum_tape_block_data_length( block ), type );
-  if( error != LIBSPECTRUM_ERROR_NONE ) return error;
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return write_tap_block( buffer, libspectrum_tape_block_data( block ),
+			  libspectrum_tape_block_data_length( block ), type );
 }
 
 static libspectrum_error

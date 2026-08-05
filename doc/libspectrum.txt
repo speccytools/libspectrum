@@ -1,4 +1,4 @@
-libspectrum 1.6.0
+libspectrum 1.6.3
 =================
 
 libspectrum is a fairly simple library designed to make the handling
@@ -217,6 +217,22 @@ General functions
 =================
 
 Functions which don't relate directly to one file type or another.
+
+libspectrum_error
+libspectrum_zx_string_to_utf8( char *buffer, size_t length,
+                               const libspectrum_byte *src, size_t src_length )
+
+Convert a ZX Spectrum encoded string to UTF-8 in caller-provided `buffer'.
+Trailing spaces are stripped. Printable ASCII characters are copied as
+is except for `\\', which is escaped as `\\\\'. Spectrum-specific
+characters are converted to readable UTF-8 or textual equivalents:
+`^' becomes an up-arrow, '`' becomes a pound sign, character 127 becomes
+copyright, graphics characters become backslash-prefixed mosaics, user-
+defined graphics become `\\a' to `\\u', and keyword tokens expand to
+their BASIC text. `buffer' must have room for at least nine times
+`src_length', plus one byte for the terminating NUL; the extra space allows
+for expanded BASIC keyword tokens. `LIBSPECTRUM_ERROR_INVALID' is returned
+if an argument is invalid or `buffer' is too short.
 
 Machine types and capabilities
 ------------------------------

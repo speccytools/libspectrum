@@ -85,7 +85,7 @@ identify_machine( size_t buffer_length, libspectrum_snap *snap )
 
 static libspectrum_error
 libspectrum_plusd_read_header( const libspectrum_byte *buffer,
-			       size_t buffer_length, libspectrum_snap *snap )
+			       size_t buffer_length GCC_UNUSED, libspectrum_snap *snap )
 {
   libspectrum_byte i;
 

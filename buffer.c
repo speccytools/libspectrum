@@ -53,7 +53,11 @@ libspectrum_buffer_alloc( void )
 {
   libspectrum_buffer *buffer = libspectrum_new0( libspectrum_buffer, 1 );
 
-  libspectrum_buffer_reallocate( buffer, 65536 );
+  /* Small initial allocation; the buffer grows by doubling as needed via
+     reallocate_to_new_size(). Most buffers are short-lived and small; the
+     previous 65536-byte seed wasted significant peak heap when many buffers
+     are alive simultaneously (e.g. during SZX snapshot writes). */
+  libspectrum_buffer_reallocate( buffer, 1024 );
 
   return buffer;
 }

@@ -1,3 +1,108 @@
+2026-07-25  Fredrick Meunier  <fredm@spamcop.net>
+
+        * libspectrum 1.6.3 released.
+
+        * Add libspectrum_zx_string_to_utf8() to translate ZX Spectrum strings
+          to UTF-8 (Fredrick Meunier).
+
+        * Fix 64-bit Windows compilation on MSYS2/MINGW64 (Sergio Baldoví).
+
+        * Fix use-after-free and RZX input block length handling (Fredrick
+          Meunier).
+
+        * Add const qualifiers to tape block getter parameters (Fredrick
+          Meunier).
+
+        * Various minor bug fixes/improvements:
+          * Improve error propagation when writing TAP blocks (Fredrick
+            Meunier).
+          * Enable extra GCC warnings and fix associated warnings (Fredrick
+            Meunier).
+          * Add unit tests for tape, snapshot, timing, file identification,
+            machine capability, SZX chunk, and utility APIs (Fredrick Meunier).
+          * Update GitHub Actions and improve CI dependency cache invalidation
+            (Fredrick Meunier).
+
+2026-06-14  Fredrick Meunier  <fredm@spamcop.net>
+
+        * libspectrum 1.6.2 released.
+
+        * Fix TZX pulse handling by starting blocks with the pulse level set to
+          low by default (fixes bugs #352, #357 and #431) (Alberto Garcia).
+
+        * Improve tape block handling by adding CONCAT block support to block
+          descriptions and edge generation, and fixing related memory leaks in
+          CONCAT, PULS and PZXT block handling (Fredrick Meunier).
+
+        * Various minor bug fixes/improvements:
+          * Split TZX PULSE_SEQUENCE blocks when needed to keep single-repeat
+            pulse counts within format limits (Fredrick Meunier).
+          * Fix error-path memory handling in CSW, SZX and RZX readers
+            (Fredrick Meunier).
+          * Improve TZX/PZX string and write handling, including bulk string
+            writes and simpler NUL-terminated string parsing (Fredrick
+            Meunier).
+          * Add unit tests for tape block accessors, RZX handling, and
+            additional snapshot accessors (Fredrick Meunier).
+          * Reorganise the test suite into separate modules and rename tests
+            with more descriptive identifiers (Fredrick Meunier).
+          * Improve GitHub Actions workflows with cache handling, concurrency
+            cancellation, and updated Windows action pinning (Fredrick
+            Meunier).
+
+2026-05-05  Fredrick Meunier  <fredm@spamcop.net>
+
+        * libspectrum 1.6.1 released.
+
+        * Fix PZX string reading to advance past the null terminator, so that
+          archive info tag-value pairs after the title in a PZX PZXT block are
+          no longer silently ignored (Fredrick Meunier).
+
+        * Reduce initial buffer allocation from 65536 to 1024 bytes, cutting
+          peak heap usage during SZX snapshot writes from ~640 KB to ~10 KB
+          before payload data is written (Fredrick Meunier).
+
+        * Optimise reallocate_to_new_size() to compute the final target size
+          first and call realloc exactly once, instead of once per doubling
+          step (Fredrick Meunier).
+
+        * Zero-initialise struct fields in alloc functions by switching from
+          libspectrum_new to libspectrum_new0 in tape_block, dck_block,
+          buffer, rzx, ide, microdrive, and creator alloc functions,
+          preventing reads of uninitialised memory (Fredrick Meunier).
+
+        * Add const to libspectrum_creator getter function parameters, making
+          them callable with const pointers without a cast (Fredrick Meunier).
+
+        * Various minor bug fixes/improvements:
+          * Add extensive unit tests for snap accessor functions covering Plus
+            D, DivIDE, DivMMC, AY registers, beta disk, ZXATASP, SpecDrum,
+            Fuller Box, Multiface, custom ROM, RAM pages, interface1, Z80
+            registers, and creator API (tests 85-116) (Fredrick Meunier).
+          * Add unit tests for buffer write functions, buffer_set, and
+            buffer_append (tests 77-84) (Fredrick Meunier).
+          * Add microdrive API and serialisation round-trip tests (tests
+            91-93) (Fredrick Meunier).
+          * Use byte arrays in libspectrum_buffer_write_word and
+            libspectrum_buffer_write_dword to avoid type-punning casts
+            (Fredrick Meunier).
+          * Make stdatomic usage C23-compatible (Fredrick Meunier).
+          * Update bundled pkg.m4 from serial 1 (pkg-config 0.24) to serial 12
+            (pkg-config 0.29.2) (Fredrick Meunier).
+          * Remove obsolete AC_C_CONST macro from configure.ac (Fredrick
+            Meunier).
+          * Upgrade SourceForge URLs from http:// to https:// (Fredrick
+            Meunier).
+          * Document need to run ldconfig on some Linux installs (fixes bug
+            #483) (Fredrick Meunier, thanks Benton Ferguson).
+          * Add missing and update stale exported function documentation
+            (Fredrick Meunier).
+          * Fix typo and remove redundant autoreconf in macOS GitHub Actions
+            workflow (Fredrick Meunier).
+          * Remove unused libxml2 dependency from Linux and macOS GitHub
+            workflows (Fredrick Meunier).
+          * Use macOS 26 runners for GitHub macOS actions (Fredrick Meunier).
+
 2026-03-21  Philip Kendall  <philip-fuse@shadowmagic.org.uk>
 
         * libspectrum 1.6.0 released.

@@ -3,6 +3,10 @@ run-name: Build and test Libspectrum for WII / ${{ github.actor }} /
 
 # Executed upon each commit pushed, merge commit in PR
 on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
   
 jobs:
   # 1. Only one case possible - without all libs, fake glib

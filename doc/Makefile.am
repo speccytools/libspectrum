@@ -24,4 +24,5 @@ man_MANS = doc/libspectrum.3
 EXTRA_DIST += \
 	$(man_MANS) \
 	doc/libspectrum.txt \
+	doc/releasing.md \
 	doc/Makefile.am

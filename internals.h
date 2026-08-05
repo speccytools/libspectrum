@@ -154,6 +154,11 @@ libspectrum_error
 libspectrum_split_to_48k_pages( libspectrum_snap *snap,
                                 const libspectrum_byte* data );
 
+/* Write one 16KB RAM page to a buffer; fills with 0xff if the page is absent */
+void
+libspectrum_write_snap_page( libspectrum_buffer *buffer,
+                             libspectrum_snap *snap, int page );
+
 /* Sizes of some of the arrays in the snap structure */
 #define SNAPSHOT_RAM_PAGES 16
 #define SNAPSHOT_SLT_PAGES 256
