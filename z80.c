@@ -1796,7 +1796,8 @@ compress_block( libspectrum_byte **dest, size_t *dest_length,
 	/* If not, just output the bytes */
 	libspectrum_make_room( dest, run_length, &out_ptr, dest_length );
 
-	while(run_length--) *out_ptr++ = repeated;
+	memset( out_ptr, repeated, run_length );
+	out_ptr += run_length;
 
       }
 
@@ -1853,7 +1854,8 @@ uncompress_block( libspectrum_byte **dest, size_t *dest_length,
 
       libspectrum_make_room( dest, run_length, &out_ptr, dest_length );
 
-      while(run_length--) *out_ptr++ = repeated;
+      memset( out_ptr, repeated, run_length );
+      out_ptr += run_length;
 
     } else {
 

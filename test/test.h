@@ -28,6 +28,7 @@ test_return_t check_edges( const char *filename, test_edge_sequence_t *edges,
 
 test_return_t tape_with_unknown_block( void );
 test_return_t tzx_turbo_data_with_zero_pilot_pulses_and_zero_data( void );
+test_return_t tzx_pure_data_with_zero_used_bits( void );
 test_return_t writing_empty_tap_file( void );
 test_return_t invalid_compressed_file_1( void );
 test_return_t invalid_compressed_file_2( void );
@@ -57,6 +58,7 @@ test_return_t rzx_invalid_frame_data_error_does_not_free_repeat_frame_pointer( v
 test_return_t zero_tail_length_pzx_file( void );
 test_return_t no_pilot_pulse_gdb_tzx_file( void );
 test_return_t csw_conversion( void );
+test_return_t csw_rle_pulse_conversion( void );
 test_return_t write_szx_z80r_chunk( void );
 test_return_t write_szx_spcr_chunk( void );
 test_return_t write_szx_joy_chunk( void );
@@ -233,6 +235,13 @@ test_return_t rzx_get_keyid_returns_zero_with_no_signature_block( void );
 test_return_t rzx_iterator_get_frames_returns_size_t_max_for_non_input_block( void );
 test_return_t rzx_read_uncompressed_input_respects_declared_block_length( void );
 test_return_t rzx_read_input_rejects_block_length_less_than_18( void );
+test_return_t rzx_iterator_delete_removes_block_from_list( void );
+test_return_t rzx_rollback_returns_last_snap_and_removes_trailing_blocks( void );
+test_return_t rzx_rollback_on_rzx_with_no_snap_returns_error( void );
+test_return_t rzx_rollback_to_returns_nth_snap( void );
+test_return_t rzx_start_playback_returns_invalid_with_no_input_block( void );
+test_return_t rzx_playback_delivers_stored_in_bytes( void );
+test_return_t rzx_playback_frame_returns_corrupt_on_in_count_mismatch( void );
 test_return_t machine_capabilities_16k_and_48k_have_no_capabilities( void );
 test_return_t machine_capabilities_48k_ntsc_has_ntsc_only( void );
 test_return_t machine_capabilities_tc2048_has_timex_and_kempston( void );
@@ -276,6 +285,9 @@ test_return_t utilities_zx_string_to_utf8_special_chars( void );
 test_return_t utilities_zx_string_to_utf8_udg_char( void );
 test_return_t utilities_zx_string_to_utf8_spectrum_token( void );
 test_return_t utilities_zx_string_to_utf8_buffer_too_short_is_invalid( void );
+test_return_t utilities_zx_string_to_utf8_graphics_token( void );
+test_return_t utilities_zx_string_to_utf8_control_char( void );
+test_return_t utilities_zx_string_to_utf8_empty_source( void );
 
 /* szx.c (IF1) */
 test_return_t write_szx_if1_chunk( void );
@@ -286,11 +298,64 @@ test_return_t timings_48k_processor_speed_and_frame_timing( void );
 test_return_t timings_128k_processor_speed_and_frame_timing( void );
 test_return_t timings_pentagon_processor_speed_and_frame_timing( void );
 test_return_t timings_ts2068_processor_speed_and_frame_timing( void );
+test_return_t timings_plus3_processor_speed_and_frame_timing( void );
+test_return_t timings_tc2048_processor_speed_and_frame_timing( void );
+test_return_t timings_scorpion_processor_speed_and_frame_timing( void );
 test_return_t timings_unknown_machine_returns_zero_for_all_frame_timings( void );
+test_return_t timings_48k_frame_timing_accessors( void );
+test_return_t timings_unknown_machine_frame_accessors_return_zero( void );
 
 /* tape.c: tape_present and tape_clear */
 test_return_t tape_present_returns_false_for_empty_tape( void );
 test_return_t tape_present_true_after_load_and_false_after_clear( void );
+
+/* tape-iterator.c */
+test_return_t tape_iterator_init_on_empty_tape_returns_null( void );
+test_return_t tape_iterator_traverses_appended_blocks_in_order( void );
+test_return_t tape_iterator_peek_next_returns_null_at_last_block( void );
+test_return_t tape_iterator_peek_next_does_not_advance_iterator( void );
+test_return_t tape_position_returns_zero_for_first_block( void );
+test_return_t tape_nth_block_selects_correct_block( void );
+test_return_t tape_insert_block_into_empty_tape_sets_current_block( void );
+test_return_t tape_insert_block_at_position( void );
+test_return_t tape_remove_block_from_tape( void );
+test_return_t tape_peek_last_block_returns_last_appended( void );
+test_return_t tape_select_next_block_advances_and_wraps( void );
+test_return_t tape_count_returns_correct_count( void );
+test_return_t tape_current_block_returns_null_on_empty_tape( void );
+test_return_t tape_current_block_returns_first_block_after_init( void );
+test_return_t tape_block_set_type_changes_block_type( void );
+test_return_t tape_state_on_fresh_tape_returns_invalid( void );
+test_return_t tape_set_state_and_get_state_round_trip( void );
+test_return_t tape_block_type_returns_type_set_at_alloc( void );
+test_return_t tape_block_alloc_several_types( void );
+
+/* tape.c: tape_block_description */
+test_return_t tape_block_description_rom( void );
+test_return_t tape_block_description_turbo( void );
+test_return_t tape_block_description_pure_tone( void );
+test_return_t tape_block_description_pulses( void );
+test_return_t tape_block_description_pure_data( void );
+test_return_t tape_block_description_raw_data( void );
+test_return_t tape_block_description_generalised_data( void );
+test_return_t tape_block_description_pause( void );
+test_return_t tape_block_description_group_start( void );
+test_return_t tape_block_description_group_end( void );
+test_return_t tape_block_description_jump( void );
+test_return_t tape_block_description_loop_start( void );
+test_return_t tape_block_description_loop_end( void );
+test_return_t tape_block_description_select( void );
+test_return_t tape_block_description_stop48( void );
+test_return_t tape_block_description_set_signal_level( void );
+test_return_t tape_block_description_comment( void );
+test_return_t tape_block_description_message( void );
+test_return_t tape_block_description_archive_info( void );
+test_return_t tape_block_description_hardware( void );
+test_return_t tape_block_description_custom( void );
+test_return_t tape_block_description_concat( void );
+test_return_t tape_block_description_rle_pulse( void );
+test_return_t tape_block_description_pulse_sequence( void );
+test_return_t tape_block_description_data_block( void );
 
 /* identify.c */
 test_return_t identify_class_unknown_returns_class_unknown( void );
@@ -316,5 +381,41 @@ test_return_t identify_class_pok_returns_class_auxiliary( void );
 test_return_t identify_class_screen_scr_returns_class_screenshot( void );
 test_return_t identify_class_disk_opd_returns_class_disk_opus( void );
 test_return_t identify_class_disk_d80_returns_class_disk_didaktik( void );
+
+/* utilities.c (check_version / version) */
+test_return_t utilities_version_returns_nonempty_string( void );
+test_return_t utilities_check_version_current_version_returns_true( void );
+test_return_t utilities_check_version_very_old_required_returns_true( void );
+test_return_t utilities_check_version_future_major_returns_false( void );
+
+/* identify_file */
+test_return_t identify_file_tzx_magic_returns_tape_tzx( void );
+test_return_t identify_file_szx_magic_returns_snapshot_szx( void );
+test_return_t identify_file_rzx_magic_returns_recording_rzx( void );
+test_return_t identify_file_pzx_magic_returns_tape_pzx( void );
+test_return_t identify_file_unknown_buffer_returns_unknown( void );
+test_return_t identify_file_with_class_tzx_returns_type_and_tape_class( void );
+test_return_t identify_file_with_class_szx_returns_type_and_snapshot_class( void );
+test_return_t identify_file_raw_tzx_magic_returns_tape_tzx( void );
+test_return_t identify_file_raw_gz_magic_returns_compressed_gz( void );
+test_return_t identify_file_raw_sna_filename_returns_snapshot_sna( void );
+test_return_t identify_file_raw_unknown_buffer_returns_unknown( void );
+
+/* snap-read.c */
+test_return_t split_to_48k_pages_distributes_memory_to_correct_pages( void );
+test_return_t split_to_48k_pages_fails_when_page_already_occupied( void );
+test_return_t write_snap_page_writes_ram_data_to_buffer( void );
+test_return_t write_snap_page_fills_0xff_for_absent_page( void );
+
+/* tape.c: tape_block_metadata and tape_block_length */
+test_return_t tape_block_metadata_data_block_returns_zero( void );
+test_return_t tape_block_metadata_metadata_block_returns_one( void );
+test_return_t tape_block_length_pause_block_returns_pause_tstates( void );
+test_return_t tape_block_length_pure_tone_returns_pulses_times_length( void );
+test_return_t tape_block_length_metadata_block_returns_zero( void );
+
+/* tape-iterator.c: tape_state and tape_set_state */
+test_return_t tape_state_returns_pilot_for_new_rom_block( void );
+test_return_t tape_set_state_updates_state_of_rom_block( void );
 
 #endif

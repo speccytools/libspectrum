@@ -61,10 +61,8 @@ static const char *spectrum_tokens[] = {
 };
 
 static const char *graphics_tokens[] = {
-  "\\  ", "\\ '", "\\' ", "\\''",
-  "\\ .", "\\ :", "\\'.", "\\':",
-  "\\. ", "\\.'", "\\: ", "\\:'",
-  "\\..", "\\.:", "\\:.", "\\::"
+  " ", "▝", "▘", "▀", "▗", "▐", "▚", "▜",
+  "▖", "▞", "▌", "▛", "▄", "▟", "▙", "█"
 };
 
 static libspectrum_error
@@ -163,11 +161,11 @@ libspectrum_zx_string_to_utf8( char *buffer, size_t length,
         text = ascii;
       } else if( b >= 128 && b <= 143 ) {
         text = graphics_tokens[ b - 128 ];
-      } else if( b >= 144 && b <= 164 ) {
+      } else if( b >= 144 && b <= 162 ) {
         udg[1] = 'a' + b - 144;
         text = udg;
-      } else if( b >= 165 ) {
-        text = spectrum_tokens[ b - 165 ];
+      } else if( b >= 163 ) {
+        text = spectrum_tokens[ b - 163 ];
       } else {
         text = "?";
       }

@@ -1,8 +1,10 @@
 #include "config.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #include "common.h"
+#include "internals.h"
 #include "test.h"
 
 /* Test for bug #102: invalid compressed file causes crash */
@@ -233,3 +235,175 @@ reading_old_szx_file( void )
   return r;
 }
 
+
+/* libspectrum_split_to_48k_pages: each 16K region goes to the correct page */
+test_return_t
+split_to_48k_pages_distributes_memory_to_correct_pages( void )
+{
+  libspectrum_snap *snap;
+  libspectrum_byte data[0xc000];
+  test_return_t r = TEST_FAIL;
+
+  memset( &data[0x0000], 0x11, 0x4000 );
+  memset( &data[0x4000], 0x22, 0x4000 );
+  memset( &data[0x8000], 0x33, 0x4000 );
+
+  snap = libspectrum_snap_alloc();
+  if( !snap ) {
+    fprintf( stderr, "%s: split_to_48k_pages_distributes_memory_to_correct_pages: snap_alloc failed\n", progname );
+    return TEST_INCOMPLETE;
+  }
+
+  if( libspectrum_split_to_48k_pages( snap, data ) != LIBSPECTRUM_ERROR_NONE ) {
+    fprintf( stderr, "%s: split_to_48k_pages_distributes_memory_to_correct_pages: split failed\n", progname );
+    goto done;
+  }
+
+  if( !libspectrum_snap_pages( snap, 5 ) || libspectrum_snap_pages( snap, 5 )[0] != 0x11 ) {
+    fprintf( stderr, "%s: split_to_48k_pages_distributes_memory_to_correct_pages: page 5 mismatch\n", progname );
+    goto done;
+  }
+
+  if( !libspectrum_snap_pages( snap, 2 ) || libspectrum_snap_pages( snap, 2 )[0] != 0x22 ) {
+    fprintf( stderr, "%s: split_to_48k_pages_distributes_memory_to_correct_pages: page 2 mismatch\n", progname );
+    goto done;
+  }
+
+  if( !libspectrum_snap_pages( snap, 0 ) || libspectrum_snap_pages( snap, 0 )[0] != 0x33 ) {
+    fprintf( stderr, "%s: split_to_48k_pages_distributes_memory_to_correct_pages: page 0 mismatch\n", progname );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+done:
+  libspectrum_snap_free( snap );
+  return r;
+}
+
+/* libspectrum_split_to_48k_pages: returns LOGIC error if any page already occupied */
+test_return_t
+split_to_48k_pages_fails_when_page_already_occupied( void )
+{
+  libspectrum_snap *snap;
+  libspectrum_byte data[0xc000];
+  libspectrum_byte *page5;
+  libspectrum_error_function_t error_function;
+  test_return_t r = TEST_FAIL;
+
+  memset( data, 0, sizeof( data ) );
+
+  snap = libspectrum_snap_alloc();
+  if( !snap ) {
+    fprintf( stderr, "%s: split_to_48k_pages_fails_when_page_already_occupied: snap_alloc failed\n", progname );
+    return TEST_INCOMPLETE;
+  }
+
+  page5 = libspectrum_new( libspectrum_byte, 0x4000 );
+  libspectrum_snap_set_pages( snap, 5, page5 );
+
+  error_function = libspectrum_error_function;
+  libspectrum_error_function = NULL;
+  if( libspectrum_split_to_48k_pages( snap, data ) != LIBSPECTRUM_ERROR_LOGIC ) {
+    libspectrum_error_function = error_function;
+    fprintf( stderr, "%s: split_to_48k_pages_fails_when_page_already_occupied: expected LIBSPECTRUM_ERROR_LOGIC\n", progname );
+    goto done;
+  }
+  libspectrum_error_function = error_function;
+
+  r = TEST_PASS;
+
+done:
+  libspectrum_snap_free( snap );
+  return r;
+}
+
+/* libspectrum_write_snap_page: writes the page RAM data to buffer */
+test_return_t
+write_snap_page_writes_ram_data_to_buffer( void )
+{
+  libspectrum_snap *snap;
+  libspectrum_buffer *buf;
+  libspectrum_byte *page;
+  const libspectrum_byte *data;
+  size_t size;
+  test_return_t r = TEST_FAIL;
+
+  snap = libspectrum_snap_alloc();
+  if( !snap ) {
+    fprintf( stderr, "%s: write_snap_page_writes_ram_data_to_buffer: snap_alloc failed\n", progname );
+    return TEST_INCOMPLETE;
+  }
+
+  page = libspectrum_new( libspectrum_byte, 0x4000 );
+  memset( page, 0xab, 0x4000 );
+  libspectrum_snap_set_pages( snap, 5, page );
+
+  buf = libspectrum_buffer_alloc();
+  libspectrum_write_snap_page( buf, snap, 5 );
+
+  size = libspectrum_buffer_get_data_size( buf );
+  data = libspectrum_buffer_get_data( buf );
+
+  if( size != 0x4000 ) {
+    fprintf( stderr, "%s: write_snap_page_writes_ram_data_to_buffer: expected 0x4000 bytes, got %lu\n",
+             progname, (unsigned long)size );
+    goto done;
+  }
+
+  if( data[0] != 0xab || data[0x3fff] != 0xab ) {
+    fprintf( stderr, "%s: write_snap_page_writes_ram_data_to_buffer: expected 0xab fill, got 0x%02x/0x%02x\n",
+             progname, data[0], data[0x3fff] );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+done:
+  libspectrum_buffer_free( buf );
+  libspectrum_snap_free( snap );
+  return r;
+}
+
+/* libspectrum_write_snap_page: fills 0xff when the page pointer is NULL */
+test_return_t
+write_snap_page_fills_0xff_for_absent_page( void )
+{
+  libspectrum_snap *snap;
+  libspectrum_buffer *buf;
+  const libspectrum_byte *data;
+  size_t size;
+  test_return_t r = TEST_FAIL;
+
+  snap = libspectrum_snap_alloc();
+  if( !snap ) {
+    fprintf( stderr, "%s: write_snap_page_fills_0xff_for_absent_page: snap_alloc failed\n", progname );
+    return TEST_INCOMPLETE;
+  }
+
+  /* Page 3 is never set -> NULL -> should fill 0xff */
+  buf = libspectrum_buffer_alloc();
+  libspectrum_write_snap_page( buf, snap, 3 );
+
+  size = libspectrum_buffer_get_data_size( buf );
+  data = libspectrum_buffer_get_data( buf );
+
+  if( size != 0x4000 ) {
+    fprintf( stderr, "%s: write_snap_page_fills_0xff_for_absent_page: expected 0x4000 bytes, got %lu\n",
+             progname, (unsigned long)size );
+    goto done;
+  }
+
+  if( data[0] != 0xff || data[0x3fff] != 0xff ) {
+    fprintf( stderr, "%s: write_snap_page_fills_0xff_for_absent_page: expected 0xff fill, got 0x%02x/0x%02x\n",
+             progname, data[0], data[0x3fff] );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+done:
+  libspectrum_buffer_free( buf );
+  libspectrum_snap_free( snap );
+  return r;
+}

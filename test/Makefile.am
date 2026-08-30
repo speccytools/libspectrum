@@ -40,12 +40,15 @@ test_test_SOURCES = \
 	test/snap-z80.c \
 	test/szx.c \
 	test/tape-edges.c \
+	test/tape-iterator.c \
 	test/tape.c \
 	test/timings.c \
 	test/utilities.c \
 	test/identify.c
 
-test_test_CFLAGS = -DSRCDIR='"$(srcdir)"'
+# The test program links the static archive to exercise private helpers.
+# On Windows, avoid dllimport declarations for the archive's public symbols.
+test_test_CFLAGS = -DSRCDIR='"$(srcdir)"' -DLIBSPECTRUM_EXPORTS
 
 test_test_DEPENDENCIES = libspectrum.la \
 			 test/complete-tzx.tzx \
@@ -71,6 +74,7 @@ test/wav-stereo-mixdown.wav: test/wav-fixtures.pl
 	$(AM_V_GEN)$(PERL) $< stereo-mixdown > $@.tmp && mv $@.tmp $@
 
 test_test_LDADD = libspectrum.la
+test_test_LDFLAGS = -static
 
 EXTRA_DIST += \
 	test/Makefile.am \
@@ -95,6 +99,7 @@ EXTRA_DIST += \
 	test/loopend.tzx \
 	test/no-pilot-gdb.tzx \
 	test/plus3.z80 \
+	test/pure-data-usedbits-zero.tzx \
 	test/random.szx \
 	test/raw-data-block.tzx \
 	test/sp-2000.sna.gz \

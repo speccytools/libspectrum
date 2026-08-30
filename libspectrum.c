@@ -68,11 +68,6 @@ libspectrum_default_error_function( libspectrum_error error,
 libspectrum_error_function_t libspectrum_error_function =
   libspectrum_default_error_function;
 
-#ifdef HAVE_GCRYPT_H
-static void
-gcrypt_log_handler( void *opaque, int level, const char *format, va_list ap );
-#endif				/* #ifdef HAVE_GCRYPT_H */
-
 /* Initialise the library */
 libspectrum_error
 libspectrum_init( void )
@@ -91,17 +86,7 @@ libspectrum_init( void )
       return LIBSPECTRUM_ERROR_LOGIC;	/* FIXME: better error code */
     }
 
-    /* Ugly hack to prevent the 'Secure memory is not locked into
-       core' message appearing */
-    gcry_set_log_handler( gcrypt_log_handler, NULL );
-
-    /* Initialise the 'secure' memory (which probably won't actually
-       be scure, but that doesn't matter as libspectrum's 'security'
-       is bogus anyway) */
-    gcry_control( GCRYCTL_INIT_SECMEM, 16384 );
-
-    /* Restore the default log handler */
-    gcry_set_log_handler( NULL, NULL );
+    gcry_control( GCRYCTL_DISABLE_SECMEM );
 
     gcry_control( GCRYCTL_INITIALIZATION_FINISHED );
   }
@@ -125,14 +110,6 @@ libspectrum_end( void )
   libspectrum_hashtable_cleanup();
 #endif				/* #ifndef HAVE_LIB_GLIB */
 }
-
-#ifdef HAVE_GCRYPT_H
-static void
-gcrypt_log_handler( void *opaque, int level, const char *format, va_list ap )
-{
-  /* Do nothing */
-}
-#endif				/* #ifdef HAVE_GCRYPT_H */
 
 int
 libspectrum_check_version( const char *version )
@@ -282,6 +259,8 @@ const int LIBSPECTRUM_MACHINE_CAPABILITY_PENT512_MEMORY = 1 << 14;
 					 /* Pentagon 512-style memory paging */
 const int LIBSPECTRUM_MACHINE_CAPABILITY_PENT1024_MEMORY = 1 << 15;
 					/* Pentagon 1024-style memory paging */
+const int LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER = 1 << 16;
+                                                             /* Beeper sound */
 
 /* Given a machine type, what features does it have? */
 int
@@ -291,29 +270,35 @@ libspectrum_machine_capabilities( libspectrum_machine type )
 
   case LIBSPECTRUM_MACHINE_16:
   case LIBSPECTRUM_MACHINE_48:
+    return LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER;
+
   case LIBSPECTRUM_MACHINE_UNKNOWN:
     return 0;
 
   case LIBSPECTRUM_MACHINE_48_NTSC:
-    return LIBSPECTRUM_MACHINE_CAPABILITY_NTSC;
+    return LIBSPECTRUM_MACHINE_CAPABILITY_NTSC |
+           LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER;
 
   case LIBSPECTRUM_MACHINE_TC2048:
     return LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY   |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO    |
-           LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK;
+           LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK |
+           LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER;
 
   case LIBSPECTRUM_MACHINE_TC2068:
     return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY   |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO    |
-           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK;
+           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK     |
+           LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER;
 
   case LIBSPECTRUM_MACHINE_TS2068:
     return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY   |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO    |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK     |
-           LIBSPECTRUM_MACHINE_CAPABILITY_NTSC;
+           LIBSPECTRUM_MACHINE_CAPABILITY_NTSC           |
+           LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER;
 
   case LIBSPECTRUM_MACHINE_128:
     return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
@@ -375,7 +360,8 @@ libspectrum_machine_capabilities( libspectrum_machine type )
            LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY        |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO       |
            LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK |
-           LIBSPECTRUM_MACHINE_CAPABILITY_SE_MEMORY;
+           LIBSPECTRUM_MACHINE_CAPABILITY_SE_MEMORY         |
+           LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER;
 
   }
 

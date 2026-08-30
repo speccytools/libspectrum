@@ -176,8 +176,24 @@ find_sample_rate( libspectrum_tape *tape )
     case LIBSPECTRUM_TAPE_BLOCK_RAW_DATA:
     case LIBSPECTRUM_TAPE_BLOCK_RLE_PULSE:
       {
-      libspectrum_dword block_rate =
-        3500000 / libspectrum_tape_block_bit_length( block );
+      libspectrum_dword scale, block_rate;
+
+      if( libspectrum_tape_block_type( block ) ==
+          LIBSPECTRUM_TAPE_BLOCK_RAW_DATA ) {
+        scale = libspectrum_tape_block_bit_length( block );
+      } else {
+        scale = libspectrum_tape_block_scale( block );
+      }
+
+      if( !scale ) {
+        libspectrum_print_error(
+          LIBSPECTRUM_ERROR_WARNING,
+          "find_sample_rate: sampled tape block has zero scale"
+        );
+        break;
+      }
+
+      block_rate = 3500000 / scale;
 
       if( found ) {
         if( block_rate != sample_rate ) {

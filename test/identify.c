@@ -1,4 +1,5 @@
-/* identify.c: unit tests for libspectrum_identify_class
+/* identify.c: unit tests for libspectrum_identify_class,
+               libspectrum_identify_file, and libspectrum_identify_file_with_class
    Copyright (c) 2026 Philip Kendall
 
    This program is free software; you can redistribute it and/or modify
@@ -233,4 +234,224 @@ identify_class_disk_d80_returns_class_disk_didaktik( void )
   return check_class( LIBSPECTRUM_ID_DISK_D80,
                       LIBSPECTRUM_CLASS_DISK_DIDAKTIK,
                       "LIBSPECTRUM_ID_DISK_D80" );
+}
+
+/* --- libspectrum_identify_file tests --- */
+
+static test_return_t
+check_identify_file( const char *label, const unsigned char *buf,
+                     size_t len, const char *filename,
+                     libspectrum_id_t expected_type )
+{
+  libspectrum_id_t got_type;
+  libspectrum_error err =
+    libspectrum_identify_file( &got_type, filename, buf, len );
+
+  if( err ) {
+    fprintf( stderr, "%s: identify_file(%s): unexpected error %d\n",
+             progname, label, err );
+    return TEST_FAIL;
+  }
+
+  if( got_type != expected_type ) {
+    fprintf( stderr,
+             "%s: identify_file(%s): expected type %d, got %d\n",
+             progname, label, expected_type, got_type );
+    return TEST_FAIL;
+  }
+
+  return TEST_PASS;
+}
+
+test_return_t
+identify_file_tzx_magic_returns_tape_tzx( void )
+{
+  static const unsigned char tzx_magic[] = {
+    'Z','X','T','a','p','e','!', 0x1a, 0x01, 0x14
+  };
+  return check_identify_file( "TZX magic", tzx_magic, sizeof( tzx_magic ),
+                               "test.tzx", LIBSPECTRUM_ID_TAPE_TZX );
+}
+
+test_return_t
+identify_file_szx_magic_returns_snapshot_szx( void )
+{
+  static const unsigned char szx_magic[] = {
+    'Z','X','S','T', 0x01, 0x04, 0x00, 0x00
+  };
+  return check_identify_file( "SZX magic", szx_magic, sizeof( szx_magic ),
+                               "test.szx", LIBSPECTRUM_ID_SNAPSHOT_SZX );
+}
+
+test_return_t
+identify_file_rzx_magic_returns_recording_rzx( void )
+{
+  static const unsigned char rzx_magic[] = {
+    'R','Z','X','!', 0x00, 0x0d, 0x00, 0x00
+  };
+  return check_identify_file( "RZX magic", rzx_magic, sizeof( rzx_magic ),
+                               "test.rzx", LIBSPECTRUM_ID_RECORDING_RZX );
+}
+
+test_return_t
+identify_file_pzx_magic_returns_tape_pzx( void )
+{
+  static const unsigned char pzx_magic[] = {
+    'P','Z','X','T', 0x00, 0x00, 0x00, 0x00
+  };
+  return check_identify_file( "PZX magic", pzx_magic, sizeof( pzx_magic ),
+                               "test.pzx", LIBSPECTRUM_ID_TAPE_PZX );
+}
+
+test_return_t
+identify_file_unknown_buffer_returns_unknown( void )
+{
+  static const unsigned char random_data[] = {
+    0xde, 0xad, 0xbe, 0xef, 0x12, 0x34, 0x56, 0x78
+  };
+  return check_identify_file( "unknown data", random_data,
+                               sizeof( random_data ),
+                               NULL, LIBSPECTRUM_ID_UNKNOWN );
+}
+
+/* --- libspectrum_identify_file_with_class tests --- */
+
+test_return_t
+identify_file_with_class_tzx_returns_type_and_tape_class( void )
+{
+  static const unsigned char tzx_magic[] = {
+    'Z','X','T','a','p','e','!', 0x1a, 0x01, 0x14
+  };
+  libspectrum_id_t    type;
+  libspectrum_class_t klass;
+  libspectrum_error err = libspectrum_identify_file_with_class(
+    &type, &klass, "test.tzx", tzx_magic, sizeof( tzx_magic ) );
+
+  if( err ) {
+    fprintf( stderr, "%s: identify_file_with_class(TZX): unexpected error %d\n",
+             progname, err );
+    return TEST_FAIL;
+  }
+
+  if( type != LIBSPECTRUM_ID_TAPE_TZX ) {
+    fprintf( stderr,
+             "%s: identify_file_with_class(TZX): expected type %d, got %d\n",
+             progname, LIBSPECTRUM_ID_TAPE_TZX, type );
+    return TEST_FAIL;
+  }
+
+  if( klass != LIBSPECTRUM_CLASS_TAPE ) {
+    fprintf( stderr,
+             "%s: identify_file_with_class(TZX): expected class %d, got %d\n",
+             progname, LIBSPECTRUM_CLASS_TAPE, klass );
+    return TEST_FAIL;
+  }
+
+  return TEST_PASS;
+}
+
+test_return_t
+identify_file_with_class_szx_returns_type_and_snapshot_class( void )
+{
+  static const unsigned char szx_magic[] = {
+    'Z','X','S','T', 0x01, 0x04, 0x00, 0x00
+  };
+  libspectrum_id_t    type;
+  libspectrum_class_t klass;
+  libspectrum_error err = libspectrum_identify_file_with_class(
+    &type, &klass, "test.szx", szx_magic, sizeof( szx_magic ) );
+
+  if( err ) {
+    fprintf( stderr,
+             "%s: identify_file_with_class(SZX): unexpected error %d\n",
+             progname, err );
+    return TEST_FAIL;
+  }
+
+  if( type != LIBSPECTRUM_ID_SNAPSHOT_SZX ) {
+    fprintf( stderr,
+             "%s: identify_file_with_class(SZX): expected type %d, got %d\n",
+             progname, LIBSPECTRUM_ID_SNAPSHOT_SZX, type );
+    return TEST_FAIL;
+  }
+
+  if( klass != LIBSPECTRUM_CLASS_SNAPSHOT ) {
+    fprintf( stderr,
+             "%s: identify_file_with_class(SZX): expected class %d, got %d\n",
+             progname, LIBSPECTRUM_CLASS_SNAPSHOT, klass );
+    return TEST_FAIL;
+  }
+
+  return TEST_PASS;
+}
+
+/* --- libspectrum_identify_file_raw tests --- */
+
+/* Helper: call libspectrum_identify_file_raw and verify expected type. */
+static test_return_t
+check_identify_file_raw( const char *label, const unsigned char *buf,
+                         size_t len, const char *filename,
+                         libspectrum_id_t expected_type )
+{
+  libspectrum_id_t got_type;
+  libspectrum_error err =
+    libspectrum_identify_file_raw( &got_type, filename, buf, len );
+
+  if( err ) {
+    fprintf( stderr, "%s: identify_file_raw(%s): unexpected error %d\n",
+             progname, label, err );
+    return TEST_FAIL;
+  }
+
+  if( got_type != expected_type ) {
+    fprintf( stderr,
+             "%s: identify_file_raw(%s): expected type %d, got %d\n",
+             progname, label, expected_type, got_type );
+    return TEST_FAIL;
+  }
+
+  return TEST_PASS;
+}
+
+test_return_t
+identify_file_raw_tzx_magic_returns_tape_tzx( void )
+{
+  static const unsigned char tzx_magic[] = {
+    'Z','X','T','a','p','e','!', 0x1a, 0x01, 0x14
+  };
+  return check_identify_file_raw( "TZX magic", tzx_magic, sizeof( tzx_magic ),
+                                   "test.tzx", LIBSPECTRUM_ID_TAPE_TZX );
+}
+
+test_return_t
+identify_file_raw_gz_magic_returns_compressed_gz( void )
+{
+  /* Unlike identify_file_with_class, identify_file_raw does NOT decompress.
+     A GZ buffer must be identified as COMPRESSED_GZ, not the inner type. */
+  static const unsigned char gz_magic[] = {
+    0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00
+  };
+  return check_identify_file_raw( "GZ magic", gz_magic, sizeof( gz_magic ),
+                                   "test.gz", LIBSPECTRUM_ID_COMPRESSED_GZ );
+}
+
+test_return_t
+identify_file_raw_sna_filename_returns_snapshot_sna( void )
+{
+  /* SNA has no magic bytes; identification relies on filename extension. */
+  static const unsigned char dummy[] = { 0x00, 0x00, 0x00, 0x00 };
+  return check_identify_file_raw( "SNA filename", dummy, sizeof( dummy ),
+                                   "spectrum.sna",
+                                   LIBSPECTRUM_ID_SNAPSHOT_SNA );
+}
+
+test_return_t
+identify_file_raw_unknown_buffer_returns_unknown( void )
+{
+  static const unsigned char random_data[] = {
+    0xde, 0xad, 0xbe, 0xef, 0x12, 0x34, 0x56, 0x78
+  };
+  return check_identify_file_raw( "unknown data", random_data,
+                                   sizeof( random_data ),
+                                   NULL, LIBSPECTRUM_ID_UNKNOWN );
 }

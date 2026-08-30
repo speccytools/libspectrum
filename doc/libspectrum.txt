@@ -1,4 +1,4 @@
-libspectrum 1.6.3
+libspectrum 1.6.4
 =================
 
 libspectrum is a fairly simple library designed to make the handling
@@ -227,8 +227,8 @@ Trailing spaces are stripped. Printable ASCII characters are copied as
 is except for `\\', which is escaped as `\\\\'. Spectrum-specific
 characters are converted to readable UTF-8 or textual equivalents:
 `^' becomes an up-arrow, '`' becomes a pound sign, character 127 becomes
-copyright, graphics characters become backslash-prefixed mosaics, user-
-defined graphics become `\\a' to `\\u', and keyword tokens expand to
+copyright, graphics characters become Unicode block elements, user-defined
+graphics become `\\a' to `\\s', and keyword tokens expand to
 their BASIC text. `buffer' must have room for at least nine times
 `src_length', plus one byte for the terminating NUL; the extra space allows
 for expanded BASIC keyword tokens. `LIBSPECTRUM_ERROR_INVALID' is returned
@@ -272,9 +272,8 @@ The `libspectrum_machine_capabilities' function:
 
 int libspectrum_machine_capabilities( libspectrum_machine type )
 
-will tell you which features (above and beyond those found on the base
-48K machine) a given `libspectrum_machine' has. It returns a bitwise OR
-of the following constants:
+will tell you which features a given `libspectrum_machine' has. It
+returns a bitwise OR of the following constants:
 
 LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY
   This machine has 128K of memory accessible as on the 128K machine.
@@ -282,6 +281,10 @@ LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY
 LIBSPECTRUM_MACHINE_CAPABILITY_AY
   This machine has an AY-3-8912 sound chip (as in the 128K and later
   machines).
+
+LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER
+  This machine has a one-bit beeper, as found on the Spectrum 16K/48K
+  and Timex TC2048/TC2068/TS2068, but not the Spectrum 128K.
 
 LIBSPECTRUM_MACHINE_CAPABILITY_EVEN_M1
   Processor M1 cycles on this machine always start on even tstate
@@ -1113,6 +1116,13 @@ int libspectrum_tape_present( libspectrum_tape *tape )
 
 Returns non-zero if `tape' currently contains a tape image and zero
 otherwise.
+
+size_t libspectrum_tape_count( const libspectrum_tape *tape )
+
+Return the total number of blocks in `tape'. An empty tape has zero blocks.
+The valid indices for `libspectrum_tape_nth_block' range from zero to one
+less than this value; the value itself is the position immediately after the
+final block.
 
 libspectrum_error libspectrum_tape_position( int *n, libspectrum_tape *tape )
 

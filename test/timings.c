@@ -179,6 +179,105 @@ timings_ts2068_processor_speed_and_frame_timing( void )
   return TEST_PASS;
 }
 
+/* +3 machine: 3.5469 MHz, AY, Amstrad ASIC frame timings.
+   Line = 24+128+24+52 = 228 T-states; frame = 311 lines = 70908 T-states. */
+test_return_t
+timings_plus3_processor_speed_and_frame_timing( void )
+{
+  if( check_timing( "+3", "processor_speed",
+                    3546900,
+                    libspectrum_timings_processor_speed( LIBSPECTRUM_MACHINE_PLUS3 ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "+3", "ay_speed",
+                    1773400,
+                    libspectrum_timings_ay_speed( LIBSPECTRUM_MACHINE_PLUS3 ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "+3", "tstates_per_line",
+                    228,
+                    libspectrum_timings_tstates_per_line( LIBSPECTRUM_MACHINE_PLUS3 ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "+3", "lines_per_frame",
+                    311,
+                    libspectrum_timings_lines_per_frame( LIBSPECTRUM_MACHINE_PLUS3 ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "+3", "tstates_per_frame",
+                    70908,
+                    libspectrum_timings_tstates_per_frame( LIBSPECTRUM_MACHINE_PLUS3 ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  return TEST_PASS;
+}
+
+/* TC2048 machine: 3.5 MHz, no AY, Timex SCLD 50 Hz frame timings.
+   Line = 24+128+24+48 = 224 T-states; frame = 312 lines = 69888 T-states. */
+test_return_t
+timings_tc2048_processor_speed_and_frame_timing( void )
+{
+  if( check_timing( "TC2048", "processor_speed",
+                    3500000,
+                    libspectrum_timings_processor_speed( LIBSPECTRUM_MACHINE_TC2048 ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "TC2048", "ay_speed",
+                    0,
+                    libspectrum_timings_ay_speed( LIBSPECTRUM_MACHINE_TC2048 ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "TC2048", "tstates_per_line",
+                    224,
+                    libspectrum_timings_tstates_per_line( LIBSPECTRUM_MACHINE_TC2048 ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "TC2048", "lines_per_frame",
+                    312,
+                    libspectrum_timings_lines_per_frame( LIBSPECTRUM_MACHINE_TC2048 ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "TC2048", "tstates_per_frame",
+                    69888,
+                    libspectrum_timings_tstates_per_frame( LIBSPECTRUM_MACHINE_TC2048 ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  return TEST_PASS;
+}
+
+/* Scorpion machine: 3.5 MHz, AY, Scorpion frame timings.
+   Line = 24+128+32+40 = 224 T-states; frame = 312 lines = 69888 T-states. */
+test_return_t
+timings_scorpion_processor_speed_and_frame_timing( void )
+{
+  if( check_timing( "Scorpion", "processor_speed",
+                    3500000,
+                    libspectrum_timings_processor_speed( LIBSPECTRUM_MACHINE_SCORP ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "Scorpion", "ay_speed",
+                    1750000,
+                    libspectrum_timings_ay_speed( LIBSPECTRUM_MACHINE_SCORP ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "Scorpion", "tstates_per_line",
+                    224,
+                    libspectrum_timings_tstates_per_line( LIBSPECTRUM_MACHINE_SCORP ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "Scorpion", "lines_per_frame",
+                    312,
+                    libspectrum_timings_lines_per_frame( LIBSPECTRUM_MACHINE_SCORP ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "Scorpion", "tstates_per_frame",
+                    69888,
+                    libspectrum_timings_tstates_per_frame( LIBSPECTRUM_MACHINE_SCORP ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  return TEST_PASS;
+}
+
 /* UNKNOWN machine: all timing accessors must return 0 (no timings defined). */
 test_return_t
 timings_unknown_machine_returns_zero_for_all_frame_timings( void )
@@ -206,6 +305,99 @@ timings_unknown_machine_returns_zero_for_all_frame_timings( void )
   if( check_timing( "UNKNOWN", "tstates_per_frame",
                     0,
                     libspectrum_timings_tstates_per_frame( LIBSPECTRUM_MACHINE_UNKNOWN ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  return TEST_PASS;
+}
+
+/* 48K machine: Ferranti 5C/6C frame timings.
+   left_border=24 horizontal_screen=128 right_border=24 horizontal_retrace=48
+   top_border=48 vertical_screen=192 bottom_border=48 vertical_retrace=24
+   top_left_pixel=14336 */
+test_return_t
+timings_48k_frame_timing_accessors( void )
+{
+  libspectrum_machine m = LIBSPECTRUM_MACHINE_48;
+
+  if( check_timing( "48K", "left_border", 24,
+                    libspectrum_timings_left_border( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "48K", "horizontal_screen", 128,
+                    libspectrum_timings_horizontal_screen( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "48K", "right_border", 24,
+                    libspectrum_timings_right_border( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "48K", "horizontal_retrace", 48,
+                    libspectrum_timings_horizontal_retrace( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "48K", "top_border", 48,
+                    libspectrum_timings_top_border( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "48K", "vertical_screen", 192,
+                    libspectrum_timings_vertical_screen( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "48K", "bottom_border", 48,
+                    libspectrum_timings_bottom_border( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "48K", "vertical_retrace", 24,
+                    libspectrum_timings_vertical_retrace( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "48K", "top_left_pixel", 14336,
+                    libspectrum_timings_top_left_pixel( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  return TEST_PASS;
+}
+
+/* UNKNOWN machine: all frame timing accessors return 0 */
+test_return_t
+timings_unknown_machine_frame_accessors_return_zero( void )
+{
+  libspectrum_machine m = LIBSPECTRUM_MACHINE_UNKNOWN;
+
+  if( check_timing( "UNKNOWN", "left_border", 0,
+                    libspectrum_timings_left_border( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "UNKNOWN", "horizontal_screen", 0,
+                    libspectrum_timings_horizontal_screen( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "UNKNOWN", "right_border", 0,
+                    libspectrum_timings_right_border( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "UNKNOWN", "horizontal_retrace", 0,
+                    libspectrum_timings_horizontal_retrace( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "UNKNOWN", "top_border", 0,
+                    libspectrum_timings_top_border( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "UNKNOWN", "vertical_screen", 0,
+                    libspectrum_timings_vertical_screen( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "UNKNOWN", "bottom_border", 0,
+                    libspectrum_timings_bottom_border( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "UNKNOWN", "vertical_retrace", 0,
+                    libspectrum_timings_vertical_retrace( m ) )
+      != TEST_PASS ) return TEST_FAIL;
+
+  if( check_timing( "UNKNOWN", "top_left_pixel", 0,
+                    libspectrum_timings_top_left_pixel( m ) )
       != TEST_PASS ) return TEST_FAIL;
 
   return TEST_PASS;

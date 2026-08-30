@@ -1,3 +1,36 @@
+2026-08-23  Fredrick Meunier  <fredm@spamcop.net>
+
+        * libspectrum 1.6.4 released.
+
+        * Add a beeper machine capability to the public API (Fredrick
+          Meunier).
+
+        * Add libspectrum_tape_count() to the public tape API (Fredrick
+          Meunier).
+
+        * Fix handling of TZX pure-data blocks with zero used bits (fixes bug
+          #519) (Fredrick Meunier, thanks AJ B.).
+
+        * Fix ZX string token and graphics conversion (Fredrick Meunier, thanks
+          C.Born).
+
+        * Fix tape insertion and state handling for empty tapes, avoiding null
+          pointer dereferences (Fredrick Meunier).
+
+        * Disable libgcrypt secure memory (Sergio Baldoví).
+
+        * Fix writing recorded RLE pulse blocks as CSW files (fixes bug #461)
+          (Fredrick Meunier, thanks Sergio Baldoví).
+
+        * Various minor bug fixes/improvements:
+          * Optimise Z80 snapshot run-length compression and decompression
+            (Fredrick Meunier).
+          * Add unit tests for tape, timing, snapshot, RZX, file
+            identification, utility, and ZX string APIs (Fredrick Meunier).
+          * Improve Windows test static-library handling (Fredrick Meunier).
+          * Add Dependabot configuration and update GitHub Actions dependencies
+            (Fredrick Meunier).
+
 2026-07-25  Fredrick Meunier  <fredm@spamcop.net>
 
         * libspectrum 1.6.3 released.

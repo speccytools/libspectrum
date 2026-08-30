@@ -80,7 +80,7 @@ jobs:
           echo "Use lib libaudiofile: ${{ inputs.use_libaudiofile && 'yes' || 'no' }}"
 
       - name: (2) Check out repository code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.LIBSPECTRUM_REPO }}
           ref: ${{ env.LIBSPECTRUM_BRANCH }}
@@ -88,7 +88,7 @@ jobs:
 
       - name: (3) Restore Cygwin packages
         id: cygwin-cache-load
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: |
             C:\cygwin-packages
@@ -128,7 +128,7 @@ jobs:
       - name: (5) Save Cygwin packages
         id: cygwin-cache-save
         if: steps.cygwin-cache-load.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: |
             C:\cygwin-packages
@@ -150,7 +150,6 @@ jobs:
           --build=i686-pc-cygwin \
           --host=i686-w64-mingw32 \
           --prefix=/usr/local/i686-w64-mingw32 \
-          --disable-static \
           --with-fake-glib \
           ${{ inputs.use_zlib == false && '--without-zlib' || '' }} \
           ${{ inputs.use_bzip2 == false && '--without-bzip2' || '' }} \

@@ -21,26 +21,29 @@ check_caps( const char *name,
   return TEST_PASS;
 }
 
-/* 16K and 48K machines have no special capabilities. */
+/* 16K and 48K machines have a beeper. */
 test_return_t
 machine_capabilities_16k_and_48k_have_no_capabilities( void )
 {
-  if( check_caps( "16K",  LIBSPECTRUM_MACHINE_16, 0 ) != TEST_PASS )
+  if( check_caps( "16K", LIBSPECTRUM_MACHINE_16,
+                  LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER ) != TEST_PASS )
     return TEST_FAIL;
-  if( check_caps( "48K",  LIBSPECTRUM_MACHINE_48, 0 ) != TEST_PASS )
+  if( check_caps( "48K", LIBSPECTRUM_MACHINE_48,
+                  LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER ) != TEST_PASS )
     return TEST_FAIL;
   if( check_caps( "UNKNOWN", LIBSPECTRUM_MACHINE_UNKNOWN, 0 ) != TEST_PASS )
     return TEST_FAIL;
   return TEST_PASS;
 }
 
-/* 48K NTSC has only the NTSC capability. */
+/* 48K NTSC has NTSC display and a beeper. */
 test_return_t
 machine_capabilities_48k_ntsc_has_ntsc_only( void )
 {
   return check_caps(
     "48K NTSC", LIBSPECTRUM_MACHINE_48_NTSC,
-    LIBSPECTRUM_MACHINE_CAPABILITY_NTSC );
+    LIBSPECTRUM_MACHINE_CAPABILITY_NTSC |
+    LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER );
 }
 
 /* Timex TC2048 has Timex memory paging, Timex video modes,
@@ -52,7 +55,8 @@ machine_capabilities_tc2048_has_timex_and_kempston( void )
     "TC2048", LIBSPECTRUM_MACHINE_TC2048,
     LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY   |
     LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO    |
-    LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK );
+    LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK |
+    LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER );
 }
 
 /* Timex TC2068 has AY, Timex memory/video, and cartridge dock. */
@@ -64,7 +68,8 @@ machine_capabilities_tc2068_has_ay_timex_and_dock( void )
     LIBSPECTRUM_MACHINE_CAPABILITY_AY           |
     LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY |
     LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO  |
-    LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK );
+    LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK   |
+    LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER );
 }
 
 /* Timex TS2068 has AY, Timex memory/video, cartridge dock, and NTSC. */
@@ -77,10 +82,11 @@ machine_capabilities_ts2068_has_ay_timex_dock_and_ntsc( void )
     LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY |
     LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO  |
     LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK   |
-    LIBSPECTRUM_MACHINE_CAPABILITY_NTSC );
+    LIBSPECTRUM_MACHINE_CAPABILITY_NTSC         |
+    LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER );
 }
 
-/* 128K has AY and 128-style memory paging. */
+/* 128K has AY and 128-style memory paging, but no beeper. */
 test_return_t
 machine_capabilities_128k_has_ay_and_128_memory( void )
 {
@@ -191,7 +197,7 @@ machine_capabilities_scorp_has_ay_128_trdos_scorp_memory_and_even_m1( void )
 }
 
 /* Spectrum SE has AY, 128-style memory, Timex video, Kempston joystick,
-   and SE memory paging. */
+   SE memory paging, and a beeper. */
 test_return_t
 machine_capabilities_se_has_ay_128_memory_timex_video_kempston_and_se_memory( void )
 {
@@ -201,7 +207,8 @@ machine_capabilities_se_has_ay_128_memory_timex_video_kempston_and_se_memory( vo
     LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY        |
     LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO       |
     LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK |
-    LIBSPECTRUM_MACHINE_CAPABILITY_SE_MEMORY );
+    LIBSPECTRUM_MACHINE_CAPABILITY_SE_MEMORY         |
+    LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER );
 }
 
 /* Helper: assert that libspectrum_machine_name returns the expected string. */

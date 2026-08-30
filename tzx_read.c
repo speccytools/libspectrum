@@ -102,6 +102,9 @@ tzx_read_empty_block( libspectrum_tape *tape, libspectrum_tape_type id );
 static libspectrum_error
 tzx_read_data( const libspectrum_byte **ptr, const libspectrum_byte *end,
 	       size_t *length, int bytes, libspectrum_byte **data );
+static void
+tzx_normalise_used_bits( libspectrum_byte *bits_in_last_byte,
+                         size_t *length );
 static libspectrum_error
 tzx_read_string( const libspectrum_byte **ptr, const libspectrum_byte *end,
 		 char **dest );
@@ -341,14 +344,7 @@ tzx_read_turbo_block( libspectrum_tape *tape, const libspectrum_byte **ptr,
   error = tzx_read_data( ptr, end, &length, 3, &data );
   if( error ) { libspectrum_free( block ); return error; }
 
-  if( bits_in_last_byte == 0 && length >= 1 ) {
-    bits_in_last_byte = 8;
-    length -= 1;
-  }
-
-  if( bits_in_last_byte > 8 ) {
-    bits_in_last_byte = 8;
-  }
+  tzx_normalise_used_bits( &bits_in_last_byte, &length );
 
   libspectrum_tape_block_set_bits_in_last_byte( block, bits_in_last_byte );
 
@@ -471,14 +467,7 @@ tzx_read_pure_data( libspectrum_tape *tape, const libspectrum_byte **ptr,
   error = tzx_read_data( ptr, end, &length, 3, &data );
   if( error ) { libspectrum_free( block ); return error; }
 
-  if( bits_in_last_byte == 0 && length > 1 ) {
-    bits_in_last_byte = 8;
-    length -= 1;
-  }
-
-  if( bits_in_last_byte > 8 ) {
-    bits_in_last_byte = 8;
-  }
+  tzx_normalise_used_bits( &bits_in_last_byte, &length );
 
   libspectrum_tape_block_set_bits_in_last_byte( block, bits_in_last_byte );
   libspectrum_tape_block_set_data_length( block, length );
@@ -519,14 +508,7 @@ tzx_read_raw_data (libspectrum_tape *tape, const libspectrum_byte **ptr,
   error = tzx_read_data( ptr, end, &length, 3, &data );
   if( error ) { libspectrum_free( block ); return error; }
 
-  if( bits_in_last_byte == 0 && length >= 1 ) {
-    bits_in_last_byte = 8;
-    length -= 1;
-  }
-
-  if( bits_in_last_byte > 8 ) {
-    bits_in_last_byte = 8;
-  }
+  tzx_normalise_used_bits( &bits_in_last_byte, &length );
 
   libspectrum_tape_block_set_bits_in_last_byte( block, bits_in_last_byte );
   libspectrum_tape_block_set_data_length( block, length );
@@ -1177,6 +1159,18 @@ tzx_read_data( const libspectrum_byte **ptr, const libspectrum_byte *end,
 
   return LIBSPECTRUM_ERROR_NONE;
 
+}
+
+static void
+tzx_normalise_used_bits( libspectrum_byte *bits_in_last_byte,
+                         size_t *length )
+{
+  if( *bits_in_last_byte == 0 && *length ) {
+    *bits_in_last_byte = 8;
+    --*length;
+  } else if( *bits_in_last_byte > 8 ) {
+    *bits_in_last_byte = 8;
+  }
 }
 
 static libspectrum_error

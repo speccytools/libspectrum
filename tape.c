@@ -750,6 +750,12 @@ turbo_edge( libspectrum_tape_turbo_block *block,
   return LIBSPECTRUM_ERROR_NONE;
 }
 
+static size_t
+valid_used_bits( libspectrum_byte used_bits )
+{
+  return used_bits && used_bits <= 8 ? used_bits : 8;
+}
+
 static libspectrum_error
 turbo_next_bit( libspectrum_tape_turbo_block *block,
                 libspectrum_tape_turbo_block_state *state )
@@ -773,7 +779,8 @@ turbo_next_bit( libspectrum_tape_turbo_block *block,
     /* If we're looking at the last byte, take account of the fact it
        may have less than 8 bits in it */
     if( state->bytes_through_block == block->length-1 ) {
-      state->bits_through_byte = 8 - block->bits_in_last_byte;
+      state->bits_through_byte = 8 - valid_used_bits(
+        block->bits_in_last_byte );
     } else {
       state->bits_through_byte = 0;
     }
@@ -884,7 +891,8 @@ libspectrum_tape_pure_data_next_bit( libspectrum_tape_pure_data_block *block,
     /* If we're looking at the last byte, take account of the fact it
        may have less than 8 bits in it */
     if( state->bytes_through_block == block->length-1 ) {
-      state->bits_through_byte = 8 - block->bits_in_last_byte;
+      state->bits_through_byte = 8 - valid_used_bits(
+        block->bits_in_last_byte );
     } else {
       state->bits_through_byte = 0;
     }
@@ -949,7 +957,7 @@ libspectrum_tape_raw_data_next_bit( libspectrum_tape_raw_data_block *block,
   /* Step through the data until we find an edge */
   do {
     size_t bits_in_byte = (state->bytes_through_block == block->length - 1) ?
-        block->bits_in_last_byte : 8;
+        valid_used_bits( block->bits_in_last_byte ) : 8;
     length++;
     if( ++(state->bits_through_byte) == bits_in_byte ) {
       state->bits_through_byte = 0;
@@ -1204,7 +1212,8 @@ libspectrum_tape_data_block_next_bit( libspectrum_tape_data_block *block,
     /* If we're looking at the last byte, take account of the fact it
        may have less than 8 bits in it */
     if( state->bytes_through_block == block->length-1 ) {
-      state->bits_through_byte = 8 - block->bits_in_last_byte;
+      state->bits_through_byte = 8 - valid_used_bits(
+        block->bits_in_last_byte );
     } else {
       state->bits_through_byte = 0;
     }
@@ -1315,6 +1324,13 @@ libspectrum_tape_select_next_block( libspectrum_tape *tape )
   return block;
 }
   
+/* Return the total number of blocks in the tape. */
+size_t
+libspectrum_tape_count( const libspectrum_tape *tape )
+{
+  return (size_t)g_slist_length( tape->blocks );
+}
+
 /* Get the position on the tape of the current block */
 libspectrum_error
 libspectrum_tape_position( int *n, libspectrum_tape *tape )
@@ -1394,6 +1410,12 @@ libspectrum_tape_insert_block( libspectrum_tape *tape,
 {
   tape->blocks = g_slist_insert( tape->blocks, block, position );
   tape->last_block = g_slist_last( tape->blocks );
+
+  /* If we previously didn't have a tape loaded, point to the first block */
+  if( !tape->state.current_block ) {
+    tape->state.current_block = tape->blocks;
+    libspectrum_tape_block_init( tape->blocks->data, &(tape->state) );
+  }
 
   return LIBSPECTRUM_ERROR_NONE;
 }
@@ -1584,6 +1606,13 @@ libspectrum_tape_state( libspectrum_tape *tape )
 {
   libspectrum_tape_block *block =
     libspectrum_tape_iterator_current( tape->state.current_block );
+  if( !block ) {
+    libspectrum_print_error(
+      LIBSPECTRUM_ERROR_INVALID,
+      "libspectrum_tape_state: tape has no current block"
+    );
+    return LIBSPECTRUM_TAPE_STATE_INVALID;
+  }
   switch( block->type ) {
 
     case LIBSPECTRUM_TAPE_BLOCK_PURE_DATA: return tape->state.block_state.pure_data.state;
@@ -1605,6 +1634,13 @@ libspectrum_tape_set_state( libspectrum_tape *tape, libspectrum_tape_state_type 
 {
   libspectrum_tape_block *block =
     libspectrum_tape_iterator_current( tape->state.current_block );
+  if( !block ) {
+    libspectrum_print_error(
+      LIBSPECTRUM_ERROR_INVALID,
+      "libspectrum_tape_set_state: tape has no current block"
+    );
+    return LIBSPECTRUM_ERROR_INVALID;
+  }
   switch( block->type ) {
 
     case LIBSPECTRUM_TAPE_BLOCK_PURE_DATA: tape->state.block_state.pure_data.state = state; break;

@@ -88,7 +88,7 @@ endif
 ## * Always increase the revision value.
 ## * Increase the age value only if the changes made to the ABI are backward
 ##   compatible.
-libspectrum_la_LDFLAGS = -version-info 19:0:1 -no-undefined @WINDRES_LDFLAGS@ @WAV_BACKEND_LDFLAGS@
+libspectrum_la_LDFLAGS = -version-info 20:0:2 -no-undefined @WINDRES_LDFLAGS@ @WAV_BACKEND_LDFLAGS@
 
 libspectrum_la_LIBADD = @WAV_BACKEND_LIBADD@ @GLIB_LIBS@ -lm
 
