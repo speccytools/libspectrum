@@ -111,7 +111,10 @@ libspectrum_wav_read( libspectrum_tape *tape, const char *filename )
   }
 
   libspectrum_tape_block_set_data( block, tape_buffer );
-  libspectrum_tape_append_block( tape, block );
+  tape_buffer = NULL; /* block owns the buffer now */
+  error = libspectrum_tape_append_block( tape, block );
+  if( error ) goto error;
+  block = NULL; /* tape owns the block now */
 
   internal_wav_close( reader );
   libspectrum_free( buffer );

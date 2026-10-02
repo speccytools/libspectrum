@@ -62,19 +62,10 @@ struct _GHashTable
 static GHashNode *node_free_list = NULL;
 static GHashNode *node_allocated_list = NULL;
 
-#ifdef HAVE_STDATOMIC_H
-
-static atomic_char atomic_locker = 0;
+static atomic_flag atomic_locker = ATOMIC_FLAG_INIT;
 
 #define lock() atomic_lock( &atomic_locker )
 #define unlock() atomic_unlock( &atomic_locker )
-
-#else				/* #ifdef HAVE_STDATOMIC_H */
-
-#define lock()
-#define unlock()
-
-#endif				/* #ifdef HAVE_STDATOMIC_H */
 
 static guint
 g_direct_hash (gconstpointer v)

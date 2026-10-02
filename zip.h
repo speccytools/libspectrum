@@ -163,7 +163,8 @@ libspectrum_zip_next( struct libspectrum_zip *zip, zip_stat *info );
 
 libspectrum_error
 libspectrum_zip_read( struct libspectrum_zip *zip,
-                      libspectrum_byte **buffer, size_t *size );
+                      libspectrum_byte **buffer, size_t *size,
+                      size_t max_size );
 
 int
 libspectrum_zip_locate( struct libspectrum_zip *zip, const char *filename,

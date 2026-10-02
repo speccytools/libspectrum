@@ -122,6 +122,12 @@ int libspectrum_write_dword( libspectrum_byte **buffer, libspectrum_dword d );
 
 /* (de)compression routines */
 
+/* Compressed wrapper files are always expanded in memory. 64 MiB allows over
+   three hours of a 44.1 kHz one-bit tape recording while keeping malformed
+   input well below the size of a hard disk image, which is handled directly
+   by the IDE code instead. */
+#define LIBSPECTRUM_MAX_UNCOMPRESSED_FILE ( (size_t)64 * 1024 * 1024 )
+
 libspectrum_error
 libspectrum_uncompress_file( unsigned char **new_buffer, size_t *new_length,
 			     char **new_filename, libspectrum_id_t type,
@@ -130,19 +136,23 @@ libspectrum_uncompress_file( unsigned char **new_buffer, size_t *new_length,
 
 libspectrum_error
 libspectrum_gzip_inflate( const libspectrum_byte *gzptr, size_t gzlength,
-			  libspectrum_byte **outptr, size_t *outlength );
+			  libspectrum_byte **outptr, size_t *outlength,
+                          size_t max_outlength );
 
 libspectrum_error
 libspectrum_bzip2_inflate( const libspectrum_byte *bzptr, size_t bzlength,
-			   libspectrum_byte **outptr, size_t *outlength );
+			   libspectrum_byte **outptr, size_t *outlength,
+                           size_t max_outlength );
 
 libspectrum_error
 libspectrum_zip_inflate( const libspectrum_byte *zipptr, size_t ziplength,
-			  libspectrum_byte **outptr, size_t *outlength );
+			  libspectrum_byte **outptr, size_t *outlength,
+                          size_t max_outlength );
 
 libspectrum_error
 libspectrum_zip_blind_read( const libspectrum_byte *zipptr, size_t ziplength,
-                            libspectrum_byte **outptr, size_t *outlength );
+                            libspectrum_byte **outptr, size_t *outlength,
+                            size_t max_outlength );
 
 /* The TZX file signature */
 
@@ -284,6 +294,11 @@ libspectrum_tape_block_internal_init(
                                 libspectrum_tape_block_state *iterator,
                                 libspectrum_tape *tape );
 
+/* Legacy polarity flags used only by internal tape encoders/decoders. */
+extern const int LIBSPECTRUM_TAPE_FLAGS_NO_EDGE;
+extern const int LIBSPECTRUM_TAPE_FLAGS_LEVEL_LOW;
+extern const int LIBSPECTRUM_TAPE_FLAGS_LEVEL_HIGH;
+
 libspectrum_error
 libspectrum_tape_get_next_edge_internal( libspectrum_dword *tstates, int *flags,
                                          libspectrum_tape *tape,
@@ -386,16 +401,13 @@ libspectrum_slist_cleanup( void );
 void
 libspectrum_hashtable_cleanup( void );
 
-#ifdef HAVE_STDATOMIC_H
 #include <stdatomic.h>
 
 void
-atomic_lock( atomic_char *lock_ptr );
+atomic_lock( atomic_flag *lock_ptr );
 
 void
-atomic_unlock( atomic_char *lock_ptr );
-
-#endif				/* #ifdef HAVE_STDATOMIC_H */
+atomic_unlock( atomic_flag *lock_ptr );
 
 #endif				/* #ifndef HAVE_LIB_GLIB */
 

@@ -27,21 +27,14 @@
 #include "internals.h"
 
 void
-atomic_lock( atomic_char *lock_ptr )
+atomic_lock( atomic_flag *lock )
 {
-  char locked = 1;
-  char unlocked;
-  do {
-    unlocked = 0;
-  } while( !atomic_compare_exchange_strong( lock_ptr, &unlocked, locked ) );
+  while( atomic_flag_test_and_set_explicit( lock, memory_order_acquire ) )
+    ;
 }
 
 void
-atomic_unlock( atomic_char *lock_ptr )
+atomic_unlock( atomic_flag *lock )
 {
-  char locked;
-  char unlocked = 0;
-  do {
-    locked = 1;
-  } while( !atomic_compare_exchange_strong( lock_ptr, &locked, unlocked ) );
+  atomic_flag_clear_explicit( lock, memory_order_release );
 }

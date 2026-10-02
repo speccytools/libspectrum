@@ -96,7 +96,7 @@ tzx_read_custom( libspectrum_tape *tape, const libspectrum_byte **ptr,
 static libspectrum_error
 tzx_read_concat( const libspectrum_byte **ptr, const libspectrum_byte *end );
 
-static void
+static libspectrum_error
 tzx_read_empty_block( libspectrum_tape *tape, libspectrum_tape_type id );
 
 static libspectrum_error
@@ -191,7 +191,8 @@ internal_tzx_read( libspectrum_tape *tape, const libspectrum_byte *buffer,
       if( error ) { libspectrum_tape_clear( tape ); return error; }
       break;
     case LIBSPECTRUM_TAPE_BLOCK_GROUP_END:
-      tzx_read_empty_block( tape, id );
+      error = tzx_read_empty_block( tape, id );
+      if( error ) { libspectrum_tape_clear( tape ); return error; }
       break;
     case LIBSPECTRUM_TAPE_BLOCK_JUMP:
       error = tzx_read_jump( tape, &ptr, end );
@@ -202,7 +203,8 @@ internal_tzx_read( libspectrum_tape *tape, const libspectrum_byte *buffer,
       if( error ) { libspectrum_tape_clear( tape ); return error; }
       break;
     case LIBSPECTRUM_TAPE_BLOCK_LOOP_END:
-      tzx_read_empty_block( tape, id );
+      error = tzx_read_empty_block( tape, id );
+      if( error ) { libspectrum_tape_clear( tape ); return error; }
       break;
 
     case LIBSPECTRUM_TAPE_BLOCK_SELECT:
@@ -288,9 +290,7 @@ tzx_read_rom_block( libspectrum_tape *tape, const libspectrum_byte **ptr,
   libspectrum_tape_block_set_data_length( block, length );
   libspectrum_tape_block_set_data( block, data );
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -351,9 +351,7 @@ tzx_read_turbo_block( libspectrum_tape *tape, const libspectrum_byte **ptr,
   libspectrum_tape_block_set_data_length( block, length );
   libspectrum_tape_block_set_data( block, data );
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -378,9 +376,7 @@ tzx_read_pure_tone( libspectrum_tape *tape, const libspectrum_byte **ptr,
   libspectrum_tape_block_set_count( block, (*ptr)[0] + (*ptr)[1] * 0x100 );
   (*ptr) += 2;
   
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -424,9 +420,7 @@ tzx_read_pulses_block( libspectrum_tape *tape, const libspectrum_byte **ptr,
   }
   libspectrum_tape_block_set_pulse_lengths( block, lengths );
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -473,9 +467,7 @@ tzx_read_pure_data( libspectrum_tape *tape, const libspectrum_byte **ptr,
   libspectrum_tape_block_set_data_length( block, length );
   libspectrum_tape_block_set_data( block, data );
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -514,10 +506,8 @@ tzx_read_raw_data (libspectrum_tape *tape, const libspectrum_byte **ptr,
   libspectrum_tape_block_set_data_length( block, length );
   libspectrum_tape_block_set_data( block, data );
 
-  libspectrum_tape_append_block( tape, block );
-
-  /* And return with no error */
-  return LIBSPECTRUM_ERROR_NONE;
+  /* And return */
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -648,9 +638,7 @@ tzx_read_generalised_data( libspectrum_tape *tape,
     return LIBSPECTRUM_ERROR_CORRUPT;
   }
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -670,15 +658,13 @@ tzx_read_pause( libspectrum_tape *tape, const libspectrum_byte **ptr,
 
   /* Get the pause length */
   libspectrum_set_pause_ms( block, (*ptr)[0] + (*ptr)[1] * 0x100 );
-  /* Pause blocks should change the pulse level to ensure that the
-   * last edge is properly finished, so set the block level to -1 */
-  libspectrum_tape_block_set_level( block, -1 );
+  /* TZX ID 0x20 is a low pulse for its duration. A zero-duration pause is
+     ignored by playback and therefore does not change the current level. */
+  libspectrum_tape_block_set_level( block, 0 );
   (*ptr) += 2;
 
-  libspectrum_tape_append_block( tape, block );
-
   /* And return */
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
   
 static libspectrum_error
@@ -705,9 +691,7 @@ tzx_read_group_start( libspectrum_tape *tape, const libspectrum_byte **ptr,
   if( error ) { libspectrum_free( block ); return error; }
   libspectrum_tape_block_set_text( block, name );
 			  
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -731,9 +715,7 @@ tzx_read_jump( libspectrum_tape *tape, const libspectrum_byte **ptr,
   if( offset >= 32768 ) offset -= 65536;
   libspectrum_tape_block_set_offset( block, offset);
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -757,9 +739,7 @@ tzx_read_loop_start( libspectrum_tape *tape, const libspectrum_byte **ptr,
   libspectrum_tape_block_set_count( block, (*ptr)[0] + (*ptr)[1] * 0x100 );
   (*ptr) += 2;
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -827,9 +807,7 @@ tzx_read_select( libspectrum_tape *tape, const libspectrum_byte **ptr,
 
   }
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -850,9 +828,7 @@ tzx_read_stop( libspectrum_tape *tape, const libspectrum_byte **ptr,
 
   block = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_STOP48 );
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }  
 
 static libspectrum_error
@@ -876,9 +852,7 @@ tzx_read_set_signal_level( libspectrum_tape *tape, const libspectrum_byte **ptr,
 
   libspectrum_tape_block_set_level( block, !!(**ptr) ); (*ptr)++;
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }  
 
 static libspectrum_error
@@ -903,9 +877,7 @@ tzx_read_comment( libspectrum_tape *tape, const libspectrum_byte **ptr,
   if( error ) { libspectrum_free( block ); return error; }
   libspectrum_tape_block_set_text( block, text );
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -933,9 +905,7 @@ tzx_read_message( libspectrum_tape *tape, const libspectrum_byte **ptr,
   if( error ) { libspectrum_free( block ); return error; }
   libspectrum_tape_block_set_text( block, text );
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -1003,9 +973,7 @@ tzx_read_archive_info( libspectrum_tape *tape, const libspectrum_byte **ptr,
 
   }
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -1054,9 +1022,7 @@ tzx_read_hardware( libspectrum_tape *tape, const libspectrum_byte **ptr,
     values[i] = **ptr; (*ptr)++;
   }
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -1088,9 +1054,7 @@ tzx_read_custom( libspectrum_tape *tape, const libspectrum_byte **ptr,
   libspectrum_tape_block_set_data_length( block, length );
   libspectrum_tape_block_set_data( block, data );
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 /* Concatenation block: just skip it entirely as it serves no useful
@@ -1114,12 +1078,12 @@ tzx_read_concat( const libspectrum_byte **ptr, const libspectrum_byte *end )
   return LIBSPECTRUM_ERROR_NONE;
 }
   
-static void
+static libspectrum_error
 tzx_read_empty_block( libspectrum_tape *tape, libspectrum_tape_type id )
 {
   libspectrum_tape_block *block;
   block = libspectrum_tape_block_alloc( id );
-  libspectrum_tape_append_block( tape, block );
+  return libspectrum_tape_append_block( tape, block );
 }  
 
 static libspectrum_error

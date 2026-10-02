@@ -184,6 +184,92 @@ writing_plus_3_z80_file( void )
   return r;
 }
 
+static test_return_t
+check_scorpion_z80_pages( int first_page, int page_count,
+                           libspectrum_error expected_error )
+{
+  const size_t header_length = 87;
+  const size_t compressed_length = 260;
+  size_t length, offset;
+  libspectrum_byte *buffer;
+  libspectrum_snap *snap;
+  libspectrum_error error;
+  test_return_t r = TEST_PASS;
+  int i, j;
+
+  length = header_length + page_count * ( 3 + compressed_length );
+  buffer = libspectrum_new0( libspectrum_byte, length );
+
+  /* A minimal version 3 Z80 header for a Scorpion ZS 256. */
+  buffer[30] = 55;
+  buffer[32] = 0x34;
+  buffer[33] = 0x12;
+  buffer[34] = 10;
+
+  offset = header_length;
+  for( i = 0; i < page_count; i++ ) {
+    int bank = ( i * 5 ) % 16;
+    int remaining = 0x4000;
+
+    buffer[offset    ] = compressed_length & 0xff;
+    buffer[offset + 1] = compressed_length >> 8;
+    buffer[offset + 2] = first_page + bank;
+    offset += 3;
+
+    for( j = 0; j < 65; j++ ) {
+      int run_length = remaining > 255 ? 255 : remaining;
+
+      buffer[offset++] = 0xed;
+      buffer[offset++] = 0xed;
+      buffer[offset++] = run_length;
+      buffer[offset++] = bank;
+      remaining -= run_length;
+    }
+  }
+
+  snap = libspectrum_snap_alloc();
+  error = libspectrum_snap_read( snap, buffer, length,
+                                 LIBSPECTRUM_ID_SNAPSHOT_Z80, NULL );
+
+  if( error != expected_error ) {
+    fprintf( stderr, "%s: reading Scorpion Z80 returned %d, expected %d\n",
+             progname, error, expected_error );
+    r = TEST_FAIL;
+  } else if( error == LIBSPECTRUM_ERROR_NONE ) {
+    for( i = 0; i < 16; i++ ) {
+      libspectrum_byte *page = libspectrum_snap_pages( snap, i );
+
+      if( !page || page[0] != i || page[0x3fff] != i ) {
+        fprintf( stderr, "%s: Scorpion RAM page %d was mapped incorrectly\n",
+                 progname, i );
+        r = TEST_FAIL;
+        break;
+      }
+    }
+  }
+
+  libspectrum_snap_free( snap );
+  libspectrum_free( buffer );
+  return r;
+}
+
+/* Spectaculator 6.1 used page identifiers 0--15 for Scorpion snapshots. */
+test_return_t
+reading_spectaculator_61_scorpion_z80_pages( void )
+{
+  test_return_t r;
+
+  r = check_scorpion_z80_pages( 0, 16, LIBSPECTRUM_ERROR_NONE );
+  if( r != TEST_PASS ) return r;
+
+  /* The conventional 3--18 mapping must remain unchanged. */
+  r = check_scorpion_z80_pages( 3, 16, LIBSPECTRUM_ERROR_NONE );
+  if( r != TEST_PASS ) return r;
+
+  /* Page 0 alone is not enough to identify the Spectaculator workaround. */
+  return check_scorpion_z80_pages( 0, 15, LIBSPECTRUM_ERROR_UNKNOWN );
+}
+
 /* Tests for bug #184: SZX files were written with A and F reversed */
 test_return_t
 reading_old_szx_file( void )

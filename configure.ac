@@ -20,12 +20,12 @@ dnl
 dnl E-mail: philip-fuse@shadowmagic.org.uk
 
 dnl Package version
-m4_define([libspectrum_version], [1.6.4])
+m4_define([libspectrum_version], [1.7.0])
 
 dnl Product full version
 m4_define([libspectrum_major_version], [1])
-m4_define([libspectrum_minor_version], [6])
-m4_define([libspectrum_micro_version], [4])
+m4_define([libspectrum_minor_version], [7])
+m4_define([libspectrum_micro_version], [0])
 m4_define([libspectrum_nano_version],  [0])
 m4_define([libspectrum_full_version],
           [libspectrum_major_version.libspectrum_minor_version.libspectrum_micro_version.libspectrum_nano_version])
@@ -69,6 +69,17 @@ AC_DEFINE([LIBSPECTRUM_COPYRIGHT], [libspectrum_copyright],
 
 dnl Checks for programs.
 AC_PROG_CC
+AC_MSG_CHECKING([whether $CC supports C11 or later])
+AC_COMPILE_IFELSE(
+  [AC_LANG_SOURCE([[
+#if !defined __STDC_VERSION__ || __STDC_VERSION__ < 201112L
+#error "C11 or later is required"
+#endif
+int main(void) { return 0; }
+  ]])],
+  [AC_MSG_RESULT([yes])],
+  [AC_MSG_FAILURE([a compiler with support for C11 or later is required])]
+)
 
 dnl Setup for compiling build tools (make-perl)
 if test $cross_compiling = yes; then
@@ -179,26 +190,26 @@ AS_IF([test "$myglib" = no], [
     AC_MSG_ERROR([GLib not found])
   )
 ])
-stdatomic_available=no
 AS_IF([test "$myglib" = yes], [
-  AC_MSG_CHECKING([whether stdatomic.h provides usable atomics])
-  AC_COMPILE_IFELSE([
-    AC_LANG_PROGRAM([[#include <stdatomic.h>]], [[
-      static atomic_char lock_var = 0;
-      char desired = 1;
-      char expected = 0;
-      return atomic_compare_exchange_strong( &lock_var, &expected, 1 ) ? 0 : 1;
+  AC_MSG_CHECKING([whether C11 atomic flags are usable])
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+      #include <stdatomic.h>
+
+      static atomic_flag lock = ATOMIC_FLAG_INIT;
+    ]], [[
+      if( !atomic_flag_test_and_set_explicit( &lock, memory_order_acquire ) )
+        atomic_flag_clear_explicit( &lock, memory_order_release );
     ]])
   ], [
-    stdatomic_available=yes
-    AC_DEFINE([HAVE_STDATOMIC_H], [1],
-              [Defined if stdatomic.h provides usable atomics])
+    AC_MSG_RESULT([yes])
+  ], [
+    AC_MSG_RESULT([no])
+    AC_MSG_ERROR([C11 atomic flag support is required by the internal GLib replacement])
   ])
-  AC_MSG_RESULT([$stdatomic_available])
 ])
 
 AM_CONDITIONAL(USE_MYGLIB, test "$myglib" = yes)
-AM_CONDITIONAL(HAVE_LOCK, test "$stdatomic_available" = yes)
 
 dnl If it appears we're using gcc as our compiler, turn on warnings
 if test "$ac_cv_c_compiler_gnu" = yes; then

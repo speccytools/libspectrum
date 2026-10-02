@@ -43,19 +43,10 @@ static int FREE_LIST_ALLOCATE_CHUNK = 1024;
 GSList * free_list = NULL;
 GSList * allocated_list = NULL;
 
-#ifdef HAVE_STDATOMIC_H
-
-static atomic_char atomic_locker = 0;
+static atomic_flag atomic_locker = ATOMIC_FLAG_INIT;
 
 #define lock() atomic_lock( &atomic_locker )
 #define unlock() atomic_unlock( &atomic_locker )
-
-#else				/* #ifdef HAVE_STDATOMIC_H */
-
-#define lock()
-#define unlock()
-
-#endif				/* #ifdef HAVE_STDATOMIC_H */
 
 static
 void    allocate_free   ( void ) {

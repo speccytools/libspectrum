@@ -430,6 +430,9 @@ struct libspectrum_tape_block {
 
   libspectrum_tape_type type;
 
+  /* The tape which owns this block, or NULL before it is attached. */
+  libspectrum_tape *owner;
+
   union {
     libspectrum_tape_rom_block rom;
     libspectrum_tape_turbo_block turbo;
@@ -468,6 +471,10 @@ struct libspectrum_tape_block {
 
 };
 
+/* Notify an owning tape after a successful public block mutation. */
+void
+libspectrum_tape_block_changed( libspectrum_tape_block *block );
+
 struct libspectrum_tape_block_state {
 
   /* The current block */
@@ -477,6 +484,9 @@ struct libspectrum_tape_block_state {
      to do */
   GSList* loop_block;
   size_t loop_count;
+
+  /* Absolute logical signal level currently owned by this playback state. */
+  libspectrum_tape_signal_level signal_level;
 
   /* If true then this block should start with the pulse level set to low */
   int force_low_level;

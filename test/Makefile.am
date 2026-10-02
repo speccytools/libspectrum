@@ -29,6 +29,7 @@ test_test_SOURCES = \
 	test/common.c \
 	test/creator.c \
 	test/edges.c \
+	test/file.c \
 	test/main.c \
 	test/microdrive.c \
 	test/registry.c \
@@ -84,6 +85,8 @@ EXTRA_DIST += \
 	test/empty.csw \
 	test/empty.szx \
 	test/empty.z80 \
+	test/file.hdf \
+	test/file.tzx.gz \
 	test/invalid-archiveinfo.tzx \
 	test/invalid-custominfo.tzx \
 	test/invalid-gdb.tzx \

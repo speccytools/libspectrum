@@ -149,7 +149,7 @@ play_tape( const char *filename )
 
   do {
 
-    if( libspectrum_tape_get_next_edge( &tstates, &flags, tape ) ) {
+    if( test_tape_get_next_edge( &tstates, &flags, tape ) ) {
       libspectrum_tape_free( tape );
       return TEST_INCOMPLETE;
     }

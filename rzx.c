@@ -121,6 +121,9 @@ struct libspectrum_rzx {
   libspectrum_rzx_frame_t *data_frame;
   size_t in_count;
 
+  /* Creator metadata */
+  libspectrum_creator *creator;
+
   /* Signature parameters */
   const libspectrum_byte *signed_start;
   size_t signed_length;
@@ -130,7 +133,8 @@ struct libspectrum_rzx {
 static libspectrum_error
 rzx_read_header( const libspectrum_byte **ptr, const libspectrum_byte *end );
 static libspectrum_error
-rzx_read_creator( const libspectrum_byte **ptr, const libspectrum_byte *end );
+rzx_read_creator( libspectrum_rzx *rzx, const libspectrum_byte **ptr,
+                  const libspectrum_byte *end );
 static libspectrum_error
 rzx_read_snapshot( libspectrum_rzx *rzx, const libspectrum_byte **ptr,
 		   const libspectrum_byte *end );
@@ -488,8 +492,10 @@ libspectrum_rzx_start_playback( libspectrum_rzx *rzx, int which,
     
     block = list->data;
 
-    /* Skip any blocks which aren't input recording blocks */
-    if( block->type != LIBSPECTRUM_RZX_INPUT_BLOCK ) continue;
+    /* Skip any blocks which aren't non-empty input recording blocks */
+    if( block->type != LIBSPECTRUM_RZX_INPUT_BLOCK ||
+        !block->types.input.count )
+      continue;
 
     /* Skip input recording blocks until we find the one we want */
     if( i-- ) continue;
@@ -549,7 +555,8 @@ libspectrum_rzx_playback_frame( libspectrum_rzx *rzx, int *finished,
 
       rzx_block_t *block = it->data;
 
-      if( block->type == LIBSPECTRUM_RZX_INPUT_BLOCK ) {
+      if( block->type == LIBSPECTRUM_RZX_INPUT_BLOCK &&
+          block->types.input.count ) {
 	rzx->current_block = it;
 	break;
       } else if( block->type == LIBSPECTRUM_RZX_SNAPSHOT_BLOCK ) {
@@ -584,6 +591,28 @@ libspectrum_rzx_playback_frame( libspectrum_rzx *rzx, int *finished,
   return LIBSPECTRUM_ERROR_NONE;
 }
 
+size_t
+libspectrum_rzx_playback_inputs_remaining( const libspectrum_rzx *rzx )
+{
+  if( !rzx->current_block || !rzx->current_input || !rzx->data_frame ||
+      rzx->current_frame >= rzx->current_input->count ||
+      rzx->in_count >= rzx->data_frame->count )
+    return 0;
+
+  return rzx->data_frame->count - rzx->in_count;
+}
+
+libspectrum_error
+libspectrum_rzx_playback_discard_inputs( libspectrum_rzx *rzx )
+{
+  if( !rzx->current_block || !rzx->current_input || !rzx->data_frame ||
+      rzx->current_frame >= rzx->current_input->count )
+    return LIBSPECTRUM_ERROR_INVALID;
+
+  rzx->in_count = rzx->data_frame->count;
+  return LIBSPECTRUM_ERROR_NONE;
+}
+
 libspectrum_error
 libspectrum_rzx_playback( libspectrum_rzx *rzx, libspectrum_byte *byte )
 {
@@ -606,8 +635,15 @@ libspectrum_rzx_free( libspectrum_rzx *rzx )
 {
   g_slist_foreach( rzx->blocks, block_free_wrapper, NULL );
   g_slist_free( rzx->blocks );
+  if( rzx->creator ) libspectrum_creator_free( rzx->creator );
   libspectrum_free( rzx );
   return LIBSPECTRUM_ERROR_NONE;
+}
+
+const libspectrum_creator*
+libspectrum_rzx_creator( const libspectrum_rzx *rzx )
+{
+  return rzx->creator;
 }
 
 size_t
@@ -716,7 +752,7 @@ libspectrum_rzx_read( libspectrum_rzx *rzx, const libspectrum_byte *buffer,
     switch( id ) {
 
     case LIBSPECTRUM_RZX_CREATOR_BLOCK:
-      error = rzx_read_creator( &ptr, end );
+      error = rzx_read_creator( rzx, &ptr, end );
       if( error != LIBSPECTRUM_ERROR_NONE ) {
 	libspectrum_free( new_buffer );
 	return error;
@@ -802,29 +838,64 @@ rzx_read_header( const libspectrum_byte **ptr, const libspectrum_byte *end )
 }
 
 static libspectrum_error
-rzx_read_creator( const libspectrum_byte **ptr, const libspectrum_byte *end )
+rzx_read_creator( libspectrum_rzx *rzx, const libspectrum_byte **ptr,
+                  const libspectrum_byte *end )
 {
-  size_t length;
+  libspectrum_creator *creator;
+  libspectrum_byte *custom = NULL;
+  size_t length, custom_length;
+  char program[21];
 
-  /* Check we've got enough data for the block */
+  /* Check we've got enough data for the fixed part of the block */
   if( end - (*ptr) < 28 ) {
     libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,
-			     "rzx_read_creator: not enough data in buffer" );
+                             "rzx_read_creator: not enough data in buffer" );
     return LIBSPECTRUM_ERROR_CORRUPT;
   }
 
   /* Get the length */
   length = libspectrum_read_dword( ptr );
+  if( length < 29 ) {
+    libspectrum_print_error(
+      LIBSPECTRUM_ERROR_CORRUPT,
+      "rzx_read_creator: block length %lu less than the minimum 29 bytes",
+      (unsigned long)length
+    );
+    return LIBSPECTRUM_ERROR_CORRUPT;
+  }
 
   /* Check there's still enough data (the -5 is because we've already read
      the block ID and the length) */
   if( end - (*ptr) < (ptrdiff_t)length - 5 ) {
     libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,
-			     "rzx_read_creator: not enough data in buffer" );
+                             "rzx_read_creator: not enough data in buffer" );
     return LIBSPECTRUM_ERROR_CORRUPT;
   }
 
-  (*ptr) += length - 5;
+  if( rzx->creator ) {
+    (*ptr) += length - 5;
+    return LIBSPECTRUM_ERROR_NONE;
+  }
+
+  creator = libspectrum_creator_alloc();
+
+  memcpy( program, *ptr, 20 );
+  program[20] = '\0';
+  libspectrum_creator_set_program( creator, program );
+  (*ptr) += 20;
+
+  libspectrum_creator_set_major( creator, libspectrum_read_word( ptr ) );
+  libspectrum_creator_set_minor( creator, libspectrum_read_word( ptr ) );
+
+  custom_length = length - 29;
+  if( custom_length ) {
+    custom = libspectrum_new( libspectrum_byte, custom_length );
+    memcpy( custom, *ptr, custom_length );
+    libspectrum_creator_set_custom( creator, custom, custom_length );
+    (*ptr) += custom_length;
+  }
+
+  rzx->creator = creator;
 
   return LIBSPECTRUM_ERROR_NONE;
 }

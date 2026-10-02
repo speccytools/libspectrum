@@ -22,7 +22,7 @@
 .\" E-mail: philip-fuse@shadowmagic.org.uk
 .\"
 .\"
-.TH libspectrum 3 "23rd August, 2026" "Version 1.6.4" "Emulators"
+.TH libspectrum 3 "16th September, 2026" "Version 1.7.0" "Emulators"
 .\"
 .\"------------------------------------------------------------------
 .\"
@@ -45,6 +45,8 @@ libspectrum \(em Sinclair ZX Spectrum support library
 .BI "libspectrum_error libspectrum_tape_read( libspectrum_tape *tape, const libspectrum_byte *buffer, size_t length, libspectrum_id_t type, const char *filename );"
 .br
 .BI "libspectrum_error libspectrum_rzx_read( libspectrum_rzx *rzx, const libspectrum_byte *buffer, size_t length );"
+.br
+.BI "const libspectrum_creator *libspectrum_rzx_creator( const libspectrum_rzx *rzx );"
 .PP
 Additional public helper APIs are documented in
 .RI ` libspectrum.txt ',
@@ -61,12 +63,23 @@ the growable buffer API
 .BR libspectrum_buffer_alloc ()
 through
 .BR libspectrum_buffer_append (),
-RZX signature inspection helpers such as
+the loaded-file API
+.BR libspectrum_file_init (),
+.BR libspectrum_file_open (),
+.BR libspectrum_file_read_data ()
+and
+.BR libspectrum_file_take_data (),
+RZX metadata inspection helpers such as
+.BR libspectrum_rzx_creator (),
 .BR libspectrum_rzx_get_keyid ()
 and
 .BR libspectrum_rzx_get_signature (),
 and state/query helpers such as
-.BR libspectrum_tape_state ()
+.BR libspectrum_tape_state (),
+the opaque tape cursor API from
+.BR libspectrum_tape_cursor_capture ()
+through
+.BR libspectrum_tape_cursor_position (),
 and
 .BR libspectrum_ide_dirty ().
 .\"
@@ -105,7 +118,9 @@ Additionally, any files compressed with
 .IR gzip "(3)"
 or
 .IR zip "(3)"
-can be read and will be transparently decompressed.
+can be read and will be transparently decompressed. Expanded wrapper files
+are limited to 64 MiB; input which exceeds this limit is rejected with
+.BR LIBSPECTRUM_ERROR_LIMIT .
 .PP
 Full documentation for
 .I libspectrum

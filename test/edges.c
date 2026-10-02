@@ -30,7 +30,7 @@ check_edges( const char *filename, test_edge_sequence_t *edges,
     int flags;
     libspectrum_error e;
 
-    e = libspectrum_tape_get_next_edge( &tstates, &flags, tape );
+    e = test_tape_get_next_edge( &tstates, &flags, tape );
     if( e ) {
       libspectrum_tape_free( tape );
       return TEST_INCOMPLETE;

@@ -67,7 +67,5 @@ libspectrum_z80em_read( libspectrum_tape *tape,
   /* Copy the data across */
   memcpy( z80em_block->data, buffer, length );
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }

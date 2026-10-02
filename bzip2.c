@@ -34,10 +34,20 @@
 
 libspectrum_error
 libspectrum_bzip2_inflate( const libspectrum_byte *bzptr, size_t bzlength,
-			   libspectrum_byte **outptr, size_t *outlength )
+			   libspectrum_byte **outptr, size_t *outlength,
+                           size_t max_outlength )
 {
   int error;
   unsigned int length2;
+
+  *outptr = NULL;
+
+  if( *outlength > max_outlength ) {
+    *outlength = 0;
+    libspectrum_print_error( LIBSPECTRUM_ERROR_LIMIT,
+                             "inflated data exceeds size limit" );
+    return LIBSPECTRUM_ERROR_LIMIT;
+  }
 
   /* Known length, so we can use the easy method */
   if( *outlength ) {
@@ -62,7 +72,13 @@ libspectrum_bzip2_inflate( const libspectrum_byte *bzptr, size_t bzlength,
     bz_stream stream;
     libspectrum_byte *ptr; size_t length;
 
-    length = bzlength;
+    length = MIN( bzlength, max_outlength );
+
+    if( !length ) {
+      libspectrum_print_error( LIBSPECTRUM_ERROR_LIMIT,
+                               "inflated data exceeds size limit" );
+      return LIBSPECTRUM_ERROR_LIMIT;
+    }
 
     *outptr = libspectrum_new( libspectrum_byte, length );
 
@@ -92,7 +108,7 @@ libspectrum_bzip2_inflate( const libspectrum_byte *bzptr, size_t bzlength,
     }
 
     stream.next_in = (char*)bzptr; stream.avail_in = bzlength;
-    stream.next_out = (char*)*outptr; stream.avail_out = bzlength;
+    stream.next_out = (char*)*outptr; stream.avail_out = length;
 
     while( 1 ) {
 
@@ -115,13 +131,41 @@ libspectrum_bzip2_inflate( const libspectrum_byte *bzptr, size_t bzlength,
 	return LIBSPECTRUM_ERROR_NONE;
 
       case BZ_OK:		/* More output space required */
+        {
+          size_t increment;
 
-	length += bzlength;
-	ptr = libspectrum_renew( libspectrum_byte, *outptr, length );
-	*outptr = ptr;
-	stream.next_out = (char*)*outptr + stream.total_out_lo32;
-	stream.avail_out += bzlength;
-	break;
+          if( length == max_outlength ) {
+            char overflow;
+
+            stream.next_out = &overflow; stream.avail_out = 1;
+            error = BZ2_bzDecompress( &stream );
+            if( error == BZ_STREAM_END && stream.avail_out == 1 ) {
+              error = BZ2_bzDecompressEnd( &stream );
+              if( error ) {
+                libspectrum_free( *outptr );
+                *outptr = NULL; *outlength = 0;
+                return LIBSPECTRUM_ERROR_LOGIC;
+              }
+              *outlength = length;
+              return LIBSPECTRUM_ERROR_NONE;
+            }
+
+            libspectrum_print_error( LIBSPECTRUM_ERROR_LIMIT,
+                                     "inflated data exceeds size limit" );
+            BZ2_bzDecompressEnd( &stream );
+            libspectrum_free( *outptr );
+            *outptr = NULL; *outlength = 0;
+            return LIBSPECTRUM_ERROR_LIMIT;
+          }
+
+          increment = MIN( bzlength, max_outlength - length );
+          length += increment;
+          ptr = libspectrum_renew( libspectrum_byte, *outptr, length );
+          *outptr = ptr;
+          stream.next_out = (char*)*outptr + stream.total_out_lo32;
+          stream.avail_out = increment;
+          break;
+        }
 
       default:
 	libspectrum_print_error(

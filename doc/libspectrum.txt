@@ -1,4 +1,4 @@
-libspectrum 1.6.4
+libspectrum 1.7.0
 =================
 
 libspectrum is a fairly simple library designed to make the handling
@@ -185,6 +185,8 @@ LIBSPECTRUM_ERROR_SLT		Ugly kludge used to indicate that a .z80
 LIBSPECTRUM_ERROR_INVALID	An invalid parameter was supplied to a
 				function
 LIBSPECTRUM_ERROR_MISSING_ZLIB	zlib support is unavailable or disabled
+LIBSPECTRUM_ERROR_LIMIT		A resource limit was exceeded while
+				processing the file
 LIBSPECTRUM_ERROR_LOGIC		An internal logic error has occurred;
 				should never be seen
 
@@ -347,7 +349,10 @@ libspectrum_identify_file_raw( libspectrum_id_t *type, const char *filename,
 
 `filename' should be the name of the file to be identified, or NULL if
 it is unknown. `buffer' and `length' are the contents and length of the
-file respectively.
+file respectively. The buffer may contain only the beginning of the file;
+64 bytes are sufficient for all currently defined signatures. This routine
+does not decompress compressed input, making it suitable for identifying a
+file before deciding whether its complete contents need to be read.
 
 The type of file will be returned in the `type' parameter, and can take
 the following values:
@@ -421,7 +426,11 @@ libspectrum_error
 libspectrum_identify_file( libspectrum_id_t *type, const char *filename,
 			   const unsigned char *buffer, size_t length )
 
-The parameters are the same as for `libspectrum_identify_file_raw'.
+The parameters are the same as for `libspectrum_identify_file_raw'. Unlike
+the raw function, this routine transparently decompresses compressed input
+before identifying it. Decompressed wrapper files are limited to 64 MiB;
+LIBSPECTRUM_ERROR_LIMIT is returned if the expanded data would exceed that
+limit.
 
 What in many cases may be more useful than the specific type of the
 file is whether the file is a snapshot, a tape image or whatever. This
@@ -459,7 +468,81 @@ libspectrum_identify_file_with_class(
 
 simply combines the calls to `libspectrum_identify_file' and
 `libspectrum_identify_class', returning the file type in `*type' and
-the file class in `*class'.
+the file class in `*class'. It therefore also transparently decompresses
+compressed input and applies the 64 MiB expanded-size limit described
+above. The decompressed data used during identification is discarded; callers
+which need to retain data matching the returned type and class should use the
+loaded file API below.
+
+Loaded files
+------------
+
+`libspectrum_file' represents a file ready for dispatch to a format reader. Its
+filename, data, length, type and class describe the same file layer. Opening or
+supplying data identifies the file and recursively removes compression wrappers;
+there is no public intermediate "loaded but unresolved" state. Resolution is
+limited to 32 compression layers, and each decompression operation is subject to
+the 64 MiB expanded-size limit described above.
+
+The structure is public so it can be embedded or stack-allocated, but callers
+should initialise and clear it with:
+
+void libspectrum_file_init( libspectrum_file *file )
+void libspectrum_file_clear( libspectrum_file *file )
+
+An initialised file has no name or data and has type and class UNKNOWN. `clear'
+frees all resources owned by the object and restores that empty state. The
+heap-allocation convenience functions are:
+
+libspectrum_file* libspectrum_file_alloc( void )
+void libspectrum_file_free( libspectrum_file *file )
+
+`libspectrum_file_free' accepts NULL. Do not call it for an object allocated on
+the stack; use `libspectrum_file_clear' instead.
+
+libspectrum_error
+libspectrum_file_open( libspectrum_file *file, const char *filename )
+
+Open a filesystem path and prepare the file for dispatch. Ordinary Spectrum
+files are read into an owned buffer, identified and recursively decompressed.
+HDF hard disk images identified by their signature remain path-backed so that a
+potentially large image is not read into memory. A successful call replaces any
+previous contents of `file'; a failed call leaves its previous contents intact.
+
+Data already held by an application can be supplied with either of these calls:
+
+libspectrum_error
+libspectrum_file_read_data( libspectrum_file *file, const char *filename,
+                            const libspectrum_byte *buffer, size_t length )
+
+libspectrum_error
+libspectrum_file_take_data( libspectrum_file *file, const char *filename,
+                            libspectrum_byte *buffer, size_t length )
+
+`read_data' copies the input. The caller continues to own `buffer' and may alter
+or free it after the call. `take_data' takes ownership of a buffer allocated
+compatibly with `libspectrum_free', whether the operation succeeds or fails.
+Both functions copy `filename', which may be NULL, then identify and recursively
+decompress the data. On success they replace the previous contents of `file';
+on failure those previous contents remain intact.
+
+The resolved properties are available through:
+
+const char *libspectrum_file_name( const libspectrum_file *file )
+const libspectrum_byte *libspectrum_file_data( const libspectrum_file *file )
+size_t libspectrum_file_size( const libspectrum_file *file )
+libspectrum_id_t libspectrum_file_type( const libspectrum_file *file )
+libspectrum_class_t libspectrum_file_class( const libspectrum_file *file )
+libspectrum_file_storage
+libspectrum_file_get_storage( const libspectrum_file *file )
+
+The name and data returned by the accessors are borrowed from the object and
+remain valid until it is cleared, freed or successfully replaced. Storage is one
+of LIBSPECTRUM_FILE_STORAGE_NONE, LIBSPECTRUM_FILE_STORAGE_PATH or
+LIBSPECTRUM_FILE_STORAGE_BUFFER. A path-backed HDF has no data buffer and a size
+of zero; consumers should use its filename. Buffer-backed files own their data.
+Compression suffixes are removed from the resolved filename where the relevant
+compression format supports doing so.
 
 Buffer helpers
 --------------
@@ -1083,34 +1166,100 @@ into `*buffer'. On entry, '*buffer' is assumed to be allocated
 '*length' bytes, and will grow if necessary; if '*length' is zero,
 '*buffer' can be uninitialised on entry.
 
-libspectrum_error libspectrum_tape_get_next_edge( libspectrum_dword *tstates,
-						  int *flags,
-						  libspectrum_tape *tape )
+libspectrum_error
+libspectrum_tape_get_next_edge( libspectrum_tape_edge *edge,
+                                libspectrum_tape *tape )
 
-This is the main workhorse function of the tape routines and will
-return in `tstates' the number of tstates until the next edge should
-occur from `tape'. `flags' will be set to the bitwise or of the
-following:
+Advance playback and return one event. `edge->tstates' is the duration for
+which the event's absolute post-transition `edge->level' is held.
+`edge->transition' is NONE, TOGGLE, FORCE_LOW or FORCE_HIGH. NONE represents a
+control or metadata event and does not change polarity. `edge->flags' contains
+only non-polarity BLOCK, STOP, STOP48, LENGTH_SHORT, LENGTH_LONG and TAPE bits.
+On failure neither `edge' nor any playback state is modified.
 
-LIBSPECTRUM_TAPE_FLAGS_BLOCK	The current block ends with this edge
-LIBSPECTRUM_TAPE_FLAGS_STOP	User code should stop playing the tape
-				after this edge
-LIBSPECTRUM_TAPE_FLAGS_STOP48   User code should stop playing the tape
-				after this edge if it was emulating a
-				48K machine. The desired behaviour for
-				things like the TC2048 is undefined in
-				the .tzx format :-(
-LIBSPECTRUM_TAPE_FLAGS_LEVEL_LOW The input signal from the tape should be
-				 forced low at this edge
-LIBSPECTRUM_TAPE_FLAGS_LEVEL_HIGH The input signal from the tape should be
-				  forced high at this edge
-LIBSPECTRUM_TAPE_FLAGS_NO_EDGE	This "edge" isn't really an edge and doesn't
-				change the input signal from the tape.
-LIBSPECTRUM_TAPE_FLAGS_LENGTH_SHORT This edge is a "short" edge; used
-				    for loader acceleration
-LIBSPECTRUM_TAPE_FLAGS_LENGTH_LONG This edge is a "long" edge; again
-                                   used for loader acceleration
-LIBSPECTRUM_TAPE_FLAGS_TAPE	The current tape ends with this edge
+The tape owns logical polarity. It is low after allocation, clear, successful
+read, end-of-tape rewind, or explicit `libspectrum_tape_nth_block' positioning.
+Natural block changes and stop/resume retain it; format-level explicit polarity
+instructions may force it. `libspectrum_tape_signal_level_get' queries it.
+
+libspectrum_tape_cursor*
+libspectrum_tape_cursor_capture( libspectrum_tape *tape )
+
+Capture an opaque cursor containing an independent copy of `tape''s complete
+current playback state, including signal level. Advancing the cursor does not
+change `tape'. The source tape must outlive the cursor.
+
+A cursor snapshots the structural and block-content generations of the source
+tape. Appending, inserting, removing or clearing blocks, or a successful call
+to any public setter on any source block, invalidates existing cursors. This
+deliberately strict rule includes current, future, metadata and control-flow
+blocks, even if a block is not reachable from the cursor's current playback
+path; setting a field to its existing value also counts as a mutation. Mutating
+a block which is not in the source tape has no effect on the cursor. All cursor
+advance, query and apply operations reject an invalidated cursor with
+`LIBSPECTRUM_ERROR_INVALID', and cloning one returns NULL. Validation compares
+the two tape generations and does not scan or dereference individual blocks.
+
+Some block accessors return mutable pointers to block-owned storage. Changes
+made directly through those pointers cannot be detected. To keep a cursor
+valid, callers must not modify such storage; all block mutation must use public
+setters and then treat existing cursors as invalidated.
+
+libspectrum_tape_cursor*
+libspectrum_tape_cursor_clone( const libspectrum_tape_cursor *cursor )
+
+Return an independent copy of `cursor', or NULL if it has been invalidated.
+This is useful when exploring more than one speculative playback path.
+
+libspectrum_error
+libspectrum_tape_cursor_free( libspectrum_tape_cursor *cursor )
+
+Free `cursor'.
+
+libspectrum_error
+libspectrum_tape_cursor_get_next_edge( libspectrum_tape_edge *edge,
+                                       libspectrum_tape_cursor *cursor )
+
+Advance `cursor' without changing the source tape, with the same result and
+atomic failure semantics as `libspectrum_tape_get_next_edge'.
+
+libspectrum_error
+libspectrum_tape_cursor_apply( libspectrum_tape *tape,
+                               const libspectrum_tape_cursor *cursor )
+
+Atomically replace `tape''s complete playback state, including polarity, with
+the state stored in `cursor'. The cursor must
+have been captured from `tape' and must still be valid. Applying a cursor does
+not invoke user-interface callbacks; applications should update block-selection
+displays after a successful call when appropriate.
+
+libspectrum_error
+libspectrum_tape_cursor_state( libspectrum_tape_state_type *state,
+                               const libspectrum_tape_cursor *cursor )
+
+Return in `state' the playback state stored in `cursor', without changing the
+source tape. An invalid cursor or a block type without one of the public
+playback states returns `LIBSPECTRUM_ERROR_INVALID'.
+
+libspectrum_error
+libspectrum_tape_cursor_signal_level( libspectrum_tape_signal_level *level,
+                                      const libspectrum_tape_cursor *cursor )
+
+Return in `level' the absolute input signal level corresponding to `cursor'.
+
+libspectrum_error
+libspectrum_tape_cursor_position( int *n,
+                                  const libspectrum_tape_cursor *cursor )
+
+Return in `n' the zero-based block containing `cursor''s playback position.
+This does not alter the source tape and can be used to determine whether
+applying a cursor should update a block-selection display.
+
+The source tape and its blocks must outlive every cursor captured from it. Tape
+objects and cursors have no internal locking. A caller must serialize all
+operations on a tape, its blocks and cursors captured from it, including block
+setters and cursor validation; generation checks are invalidation guards, not
+thread synchronization.
 
 int libspectrum_tape_present( libspectrum_tape *tape )
 
@@ -1134,18 +1283,22 @@ libspectrum_error libspectrum_tape_nth_block( libspectrum_tape *tape, int n )
 Set the current block on the tape to be the `n'th block and initialise
 it. Again, the first block on the tape is block 0.
 
-void
+libspectrum_error
 libspectrum_tape_append_block( libspectrum_tape *tape,
                                libspectrum_tape_block *block )
 
-Append `block' to `tape'.
+Append `block' to `tape'. This transfers ownership of `block' to `tape'. A
+block must not already belong to a tape and must not be freed separately after
+it has been appended. Both arguments must be non-NULL. A NULL argument or a
+block which already has an owner returns `LIBSPECTRUM_ERROR_INVALID'; ownership
+and both objects remain unchanged.
 
 void
 libspectrum_tape_remove_block( libspectrum_tape *tape,
 			       libspectrum_tape_iterator it )
 
-Remove the block pointed to by `it' (see the "Tape iterators" section)
-from the tape.
+Remove and free the block pointed to by `it' (see the "Tape iterators"
+section) from the tape.
 
 libspectrum_error
 libspectrum_tape_insert_block( libspectrum_tape *tape,
@@ -1153,7 +1306,10 @@ libspectrum_tape_insert_block( libspectrum_tape *tape,
 			       size_t position )
 
 Insert `block' into `tape` in position `position', where position 0
-would make the new block the first block on the tape.
+would make the new block the first block on the tape. This transfers ownership
+as described for `libspectrum_tape_append_block'. A NULL argument or a block
+which already has an owner returns `LIBSPECTRUM_ERROR_INVALID'; ownership and
+both objects remain unchanged.
 
 libspectrum_tape_block*
 libspectrum_tape_current_block( libspectrum_tape *tape )
@@ -1471,23 +1627,13 @@ LIBSPECTRUM_TAPE_STATE_DATA2 	/* Second edge of a data bit */
 LIBSPECTRUM_TAPE_STATE_TAIL 	/* The tail pause following the last data bit */
 LIBSPECTRUM_TAPE_STATE_PAUSE 	/* The pause at the end of a block */
 
-Setting this value to anything other than
-`LIBSPECTRUM_TAPE_STATE_PAUSE' will produce undefined results.
-Exposing this parameter is an ugly hack needed by Fuse to allow for
-flash-loading of tape blocks, and setting it should not be used unless
-absolutely necessary.
+This state is a read-only playback query. Use a complete tape cursor to
+advance and restore playback; partial state mutation is not supported.
 
 libspectrum_tape_state_type
 libspectrum_tape_state( libspectrum_tape *tape )
 
 Return the current playback state of the active block.
-
-libspectrum_error
-libspectrum_tape_set_state( libspectrum_tape *tape,
-                            libspectrum_tape_state_type state )
-
-Set the current playback state of the active block. This is only valid
-for block types that expose a mutable playback state.
 
 The libspectrum_tape_generalised_data_symbol_table is an opaque data
 structure which represents the "symbol table" used in the TZX
@@ -1539,6 +1685,23 @@ libspectrum_error libspectrum_rzx_free( libspectrum_rzx *rzx )
 
 Free the memory used by an input recording object as allocated by
 `libspectrum_rzx_alloc'.
+
+const libspectrum_creator*
+libspectrum_rzx_creator( const libspectrum_rzx *rzx )
+
+Return the creator metadata read from the first valid creator block in
+`rzx', or NULL if the recording does not contain one. Later creator
+blocks are ignored.
+
+The returned object is owned by `rzx' and remains valid until `rzx' is
+modified or freed. The caller must not modify or free it. The program
+name is always NUL-terminated, even when the fixed-width field in the
+RZX file is not. Custom data is retained as arbitrary binary data and
+its length is available through `libspectrum_creator_custom_length'.
+
+The creator identifies the program which last created or rewrote the
+RZX file; it does not necessarily identify the program which originally
+recorded the input.
 
 void
 libspectrum_rzx_start_input( libspectrum_rzx *rzx, libspectrum_dword tstates )
@@ -1598,6 +1761,20 @@ otherwise `*snap' will be NULL.
 If the correct number of bytes were not read from `rzx' during the
 frame via `libspectrum_rzx_playback', an error will be given.
 
+size_t
+libspectrum_rzx_playback_inputs_remaining( const libspectrum_rzx *rzx )
+
+Return the number of input bytes not yet read from the current playback
+frame. Zero is returned if there is no active playback frame or playback
+has finished.
+
+libspectrum_error
+libspectrum_rzx_playback_discard_inputs( libspectrum_rzx *rzx )
+
+Discard any unread input bytes in the current playback frame without
+moving to the next frame. LIBSPECTRUM_ERROR_INVALID is returned if there
+is no active playback frame.
+
 libspectrum_error libspectrum_rzx_playback( libspectrum_rzx *rzx,
                                             libspectrum_byte *byte )
 
@@ -1636,9 +1813,10 @@ libspectrum_rzx_read( libspectrum_rzx *rzx, const libspectrum_byte *buffer,
 
 Given a .rzx file of `length' bytes starting at `buffer', extract the
 input recording data into `rzx'. Embedded snapshots are retained within
-the recording and can be inspected via the RZX iterator functions.
-Files compressed with bzip2 or gzip will be automatically and
-transparently decompressed.
+the recording and can be inspected via the RZX iterator functions. The
+first valid creator block is retained and can be inspected with
+`libspectrum_rzx_creator'. Files compressed with bzip2 or gzip will be
+automatically and transparently decompressed.
 
 libspectrum_error
 libspectrum_rzx_write( libspectrum_byte **buffer, size_t *length,
@@ -1841,6 +2019,21 @@ The maximum length in bytes of a microdrive cartridge
 (LIBSPECTRUM_MICRODRIVE_BLOCK_MAX * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN =
 137922).
 
+LIBSPECTRUM_MICRODRIVE_HEADER_BLOCK
+
+Bit 0 of the header flag, indicating a header block. Callers should test this
+bit rather than compare the complete flag byte with 1, as its other bits may
+contain residual data.
+
+LIBSPECTRUM_MICRODRIVE_RECORD_EOF
+
+Bit 1 of the record flags, indicating the final block of a file.
+
+LIBSPECTRUM_MICRODRIVE_RECORD_NON_PRINT
+
+Bit 2 of the record flags. A clear bit indicates a PRINT file; a set bit
+indicates another file type.
+
 Routines
 --------
 
@@ -1882,14 +2075,80 @@ void
 libspectrum_microdrive_set_cartridge_len( libspectrum_microdrive *microdrive,
                                           libspectrum_byte len )
 
-Return or set the length in bytes of the cartridge in the drive.
+Return or set the number of blocks in the cartridge in the drive.
+
+size_t
+libspectrum_microdrive_block_count( const libspectrum_microdrive *microdrive )
+
+Return the number of formatted blocks in the cartridge.
+
+The following routines provide a structured, read-only view of a block. The
+`which' argument is a zero-based block index and must be less than the value
+returned by `libspectrum_microdrive_block_count'. Numeric accessors return zero
+for an invalid index. Pointer accessors return NULL for an invalid index.
+
+libspectrum_byte
+libspectrum_microdrive_block_header_flag(
+  const libspectrum_microdrive *microdrive, size_t which )
+libspectrum_byte
+libspectrum_microdrive_block_number( const libspectrum_microdrive *microdrive,
+                                     size_t which )
+libspectrum_word
+libspectrum_microdrive_block_header_unused(
+  const libspectrum_microdrive *microdrive, size_t which )
+const libspectrum_byte*
+libspectrum_microdrive_block_cartridge_name(
+  const libspectrum_microdrive *microdrive, size_t which )
+libspectrum_byte
+libspectrum_microdrive_block_header_checksum(
+  const libspectrum_microdrive *microdrive, size_t which )
+
+Return the fields in the block header. `header_unused' returns the reserved
+little-endian word at offsets 2 and 3; its value is unspecified by the format.
+The cartridge name points to a ten-byte, space-padded ZX-encoded field; it is
+not null terminated.
+
+libspectrum_byte
+libspectrum_microdrive_block_record_flags(
+  const libspectrum_microdrive *microdrive, size_t which )
+libspectrum_byte
+libspectrum_microdrive_block_record_number(
+  const libspectrum_microdrive *microdrive, size_t which )
+libspectrum_word
+libspectrum_microdrive_block_record_length(
+  const libspectrum_microdrive *microdrive, size_t which )
+const libspectrum_byte*
+libspectrum_microdrive_block_record_name(
+  const libspectrum_microdrive *microdrive, size_t which )
+libspectrum_byte
+libspectrum_microdrive_block_record_checksum(
+  const libspectrum_microdrive *microdrive, size_t which )
+
+Return the fields in the record header. Record length is at most 512 bytes.
+A used record is either marked EOF or has a length of 512. A record with EOF
+clear and length zero is empty; one with EOF set and length zero is unusable.
+The record name has the same format as the cartridge name.
+
+const libspectrum_byte*
+libspectrum_microdrive_block_data( const libspectrum_microdrive *microdrive,
+                                   size_t which )
+libspectrum_byte
+libspectrum_microdrive_block_data_checksum(
+  const libspectrum_microdrive *microdrive, size_t which )
+
+Return the 512-byte record data area and its stored checksum. Only the first
+`record_length' bytes contain record data, but the checksum covers all 512
+bytes. All pointers returned by the block accessors refer to storage owned by
+the microdrive and remain valid only until the microdrive is modified or freed.
 
 int
 libspectrum_microdrive_checksum( libspectrum_microdrive *microdrive,
                                  libspectrum_byte which )
 
 Check whether the checksum for the <n>th block on the microdrive is
-correct, where <n> is specified by `which'.
+correct, where <n> is specified by `which'. Returns 0 if all checksums are
+valid, -1 for a preset bad block, 1 for a bad header checksum, 2 for a bad
+record descriptor checksum, or 3 for a bad data checksum.
 
 .mdr file handling
 ------------------

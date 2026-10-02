@@ -100,6 +100,7 @@ typedef enum libspectrum_error {
   LIBSPECTRUM_ERROR_SLT,	/* .slt data found at end of a .z80 file */
   LIBSPECTRUM_ERROR_INVALID,	/* Invalid parameter supplied */
   LIBSPECTRUM_ERROR_MISSING_ZLIB, /* Missing or not used zlib.h */
+  LIBSPECTRUM_ERROR_LIMIT,	/* Resource limit exceeded */
 
   LIBSPECTRUM_ERROR_LOGIC = -1,
 
@@ -376,6 +377,54 @@ LIBSPECTRUM_API libspectrum_error
 libspectrum_identify_class( libspectrum_class_t *libspectrum_class,
                             libspectrum_id_t type );
 
+/* A loaded file whose name, data and identification all describe the same
+   (recursively uncompressed) layer. */
+typedef enum libspectrum_file_storage {
+  LIBSPECTRUM_FILE_STORAGE_NONE,
+  LIBSPECTRUM_FILE_STORAGE_PATH,
+  LIBSPECTRUM_FILE_STORAGE_BUFFER
+} libspectrum_file_storage;
+
+typedef struct libspectrum_file {
+  char *filename;
+  libspectrum_byte *buffer;
+  size_t length;
+  libspectrum_id_t type;
+  libspectrum_class_t file_class;
+  libspectrum_file_storage storage;
+} libspectrum_file;
+
+LIBSPECTRUM_API void libspectrum_file_init( libspectrum_file *file );
+LIBSPECTRUM_API void libspectrum_file_clear( libspectrum_file *file );
+LIBSPECTRUM_API libspectrum_file* libspectrum_file_alloc( void );
+LIBSPECTRUM_API void libspectrum_file_free( libspectrum_file *file );
+
+LIBSPECTRUM_API libspectrum_error
+libspectrum_file_open( libspectrum_file *file, const char *filename );
+
+LIBSPECTRUM_API libspectrum_error
+libspectrum_file_read_data( libspectrum_file *file, const char *filename,
+                            const libspectrum_byte *buffer, size_t length );
+
+/* Take ownership of buffer immediately, including on failure. The filename is
+   always copied. */
+LIBSPECTRUM_API libspectrum_error
+libspectrum_file_take_data( libspectrum_file *file, const char *filename,
+                            libspectrum_byte *buffer, size_t length );
+
+LIBSPECTRUM_API const char*
+libspectrum_file_name( const libspectrum_file *file );
+LIBSPECTRUM_API const libspectrum_byte*
+libspectrum_file_data( const libspectrum_file *file );
+LIBSPECTRUM_API size_t
+libspectrum_file_size( const libspectrum_file *file );
+LIBSPECTRUM_API libspectrum_id_t
+libspectrum_file_type( const libspectrum_file *file );
+LIBSPECTRUM_API libspectrum_class_t
+libspectrum_file_class( const libspectrum_file *file );
+LIBSPECTRUM_API libspectrum_file_storage
+libspectrum_file_get_storage( const libspectrum_file *file );
+
 /* Different Spectrum variants and their capabilities */
 
 /* The machine types we can handle */
@@ -637,6 +686,7 @@ typedef enum libspectrum_tape_type {
 
 typedef struct libspectrum_tape_block libspectrum_tape_block;
 typedef struct libspectrum_tape_block_state libspectrum_tape_block_state;
+typedef struct libspectrum_tape_cursor libspectrum_tape_cursor;
 typedef struct libspectrum_tape_generalised_data_symbol_table libspectrum_tape_generalised_data_symbol_table;
 
 /* Something to step through all the blocks in a tape */
@@ -646,9 +696,6 @@ typedef struct _GSList *libspectrum_tape_iterator;
 extern LIBSPECTRUM_API const int LIBSPECTRUM_TAPE_FLAGS_BLOCK;  /* End of block */
 extern LIBSPECTRUM_API const int LIBSPECTRUM_TAPE_FLAGS_STOP;	  /* Stop tape */
 extern LIBSPECTRUM_API const int LIBSPECTRUM_TAPE_FLAGS_STOP48; /* Stop tape if in 48K mode */
-extern LIBSPECTRUM_API const int LIBSPECTRUM_TAPE_FLAGS_NO_EDGE; /* Edge isn't really an edge */
-extern LIBSPECTRUM_API const int LIBSPECTRUM_TAPE_FLAGS_LEVEL_LOW; /* Set level low */
-extern LIBSPECTRUM_API const int LIBSPECTRUM_TAPE_FLAGS_LEVEL_HIGH; /* Set level high */
 extern LIBSPECTRUM_API const int LIBSPECTRUM_TAPE_FLAGS_LENGTH_SHORT;/* Short edge;
                                                 used for loader acceleration */
 extern LIBSPECTRUM_API const int LIBSPECTRUM_TAPE_FLAGS_LENGTH_LONG; /* Long edge;
@@ -719,9 +766,54 @@ libspectrum_tape_write( libspectrum_byte **buffer, size_t *length,
 /* Does this tape structure actually contain a tape? */
 LIBSPECTRUM_API int libspectrum_tape_present( const libspectrum_tape *tape );
 
+typedef enum libspectrum_tape_signal_level {
+  LIBSPECTRUM_TAPE_SIGNAL_LOW = 0,
+  LIBSPECTRUM_TAPE_SIGNAL_HIGH = 1
+} libspectrum_tape_signal_level;
+
+typedef enum libspectrum_tape_transition {
+  LIBSPECTRUM_TAPE_TRANSITION_NONE = 0,
+  LIBSPECTRUM_TAPE_TRANSITION_TOGGLE,
+  LIBSPECTRUM_TAPE_TRANSITION_FORCE_LOW,
+  LIBSPECTRUM_TAPE_TRANSITION_FORCE_HIGH
+} libspectrum_tape_transition;
+
+typedef struct libspectrum_tape_edge {
+  libspectrum_dword tstates;
+  libspectrum_tape_signal_level level;
+  libspectrum_tape_transition transition;
+  int flags;
+} libspectrum_tape_edge;
+
 LIBSPECTRUM_API libspectrum_error
-libspectrum_tape_get_next_edge( libspectrum_dword *tstates, int *flags,
-	                        libspectrum_tape *tape );
+libspectrum_tape_get_next_edge( libspectrum_tape_edge *edge,
+                                libspectrum_tape *tape );
+LIBSPECTRUM_API libspectrum_error
+libspectrum_tape_signal_level_get( libspectrum_tape_signal_level *level,
+                                   const libspectrum_tape *tape );
+
+/* Independently inspect and restore a tape playback position */
+LIBSPECTRUM_API libspectrum_tape_cursor *
+libspectrum_tape_cursor_capture( libspectrum_tape *tape );
+LIBSPECTRUM_API libspectrum_tape_cursor *
+libspectrum_tape_cursor_clone( const libspectrum_tape_cursor *cursor );
+LIBSPECTRUM_API libspectrum_error
+libspectrum_tape_cursor_free( libspectrum_tape_cursor *cursor );
+LIBSPECTRUM_API libspectrum_error
+libspectrum_tape_cursor_get_next_edge( libspectrum_tape_edge *edge,
+                                       libspectrum_tape_cursor *cursor );
+LIBSPECTRUM_API libspectrum_error
+libspectrum_tape_cursor_apply( libspectrum_tape *tape,
+                               const libspectrum_tape_cursor *cursor );
+LIBSPECTRUM_API libspectrum_error
+libspectrum_tape_cursor_state( libspectrum_tape_state_type *state,
+                               const libspectrum_tape_cursor *cursor );
+LIBSPECTRUM_API libspectrum_error
+libspectrum_tape_cursor_signal_level( libspectrum_tape_signal_level *level,
+                                      const libspectrum_tape_cursor *cursor );
+LIBSPECTRUM_API libspectrum_error
+libspectrum_tape_cursor_position( int *n,
+                                  const libspectrum_tape_cursor *cursor );
 
 /* Get the current block from the tape */
 LIBSPECTRUM_API libspectrum_tape_block *
@@ -730,11 +822,6 @@ libspectrum_tape_current_block( libspectrum_tape *tape );
 /* Get the state of the active block on the tape */
 LIBSPECTRUM_API libspectrum_tape_state_type
 libspectrum_tape_state( libspectrum_tape *tape );
-
-/* Set the state of the active block on the tape */
-LIBSPECTRUM_API libspectrum_error
-libspectrum_tape_set_state( libspectrum_tape *tape,
-                            libspectrum_tape_state_type state );
 
 /* Peek at the next block on the tape */
 LIBSPECTRUM_API libspectrum_tape_block *
@@ -764,7 +851,7 @@ LIBSPECTRUM_API libspectrum_error
 libspectrum_tape_nth_block( libspectrum_tape *tape, int n );
 
 /* Append a block to the current tape */
-LIBSPECTRUM_API void
+LIBSPECTRUM_API libspectrum_error
 libspectrum_tape_append_block( libspectrum_tape *tape,
 			       libspectrum_tape_block *block );
 
@@ -828,6 +915,12 @@ typedef struct libspectrum_rzx libspectrum_rzx;
 LIBSPECTRUM_API libspectrum_rzx* libspectrum_rzx_alloc( void );
 LIBSPECTRUM_API libspectrum_error libspectrum_rzx_free( libspectrum_rzx *rzx );
 
+/* Return the creator metadata associated with rzx, or NULL. The returned
+   object is owned by rzx and remains valid until rzx is modified or freed.
+   The caller must not free it. */
+LIBSPECTRUM_API const libspectrum_creator*
+libspectrum_rzx_creator( const libspectrum_rzx *rzx );
+
 LIBSPECTRUM_API void
 libspectrum_rzx_start_input( libspectrum_rzx *rzx, libspectrum_dword tstates );
 LIBSPECTRUM_API libspectrum_error
@@ -849,6 +942,10 @@ libspectrum_rzx_start_playback( libspectrum_rzx *rzx, int which,
 				libspectrum_snap **snap );
 LIBSPECTRUM_API libspectrum_error
 libspectrum_rzx_playback_frame( libspectrum_rzx *rzx, int *finished, libspectrum_snap **snap );
+LIBSPECTRUM_API size_t
+libspectrum_rzx_playback_inputs_remaining( const libspectrum_rzx *rzx );
+LIBSPECTRUM_API libspectrum_error
+libspectrum_rzx_playback_discard_inputs( libspectrum_rzx *rzx );
 LIBSPECTRUM_API libspectrum_error
 libspectrum_rzx_playback( libspectrum_rzx *rzx, libspectrum_byte *byte );
 
@@ -950,6 +1047,10 @@ typedef struct libspectrum_microdrive libspectrum_microdrive;
 #define LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH \
 	( LIBSPECTRUM_MICRODRIVE_BLOCK_MAX * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN )
 
+#define LIBSPECTRUM_MICRODRIVE_HEADER_BLOCK 0x01
+#define LIBSPECTRUM_MICRODRIVE_RECORD_EOF 0x02
+#define LIBSPECTRUM_MICRODRIVE_RECORD_NON_PRINT 0x04
+
 /* Constructor/destructor */
 
 LIBSPECTRUM_API libspectrum_microdrive*
@@ -977,6 +1078,48 @@ libspectrum_microdrive_cartridge_len( const libspectrum_microdrive *microdrive )
 LIBSPECTRUM_API void
 libspectrum_microdrive_set_cartridge_len( libspectrum_microdrive *microdrive,
 					  libspectrum_byte len );
+
+/* Structured block accessors. Names are ten-byte ZX-encoded fields and data
+   is LIBSPECTRUM_MICRODRIVE_DATA_LEN bytes. Returned pointers remain owned by
+   the microdrive and are invalidated when it is modified or freed. */
+LIBSPECTRUM_API size_t
+libspectrum_microdrive_block_count( const libspectrum_microdrive *microdrive );
+LIBSPECTRUM_API libspectrum_byte
+libspectrum_microdrive_block_header_flag(
+  const libspectrum_microdrive *microdrive, size_t which );
+LIBSPECTRUM_API libspectrum_byte
+libspectrum_microdrive_block_number( const libspectrum_microdrive *microdrive,
+                                     size_t which );
+LIBSPECTRUM_API libspectrum_word
+libspectrum_microdrive_block_header_unused(
+  const libspectrum_microdrive *microdrive, size_t which );
+LIBSPECTRUM_API const libspectrum_byte*
+libspectrum_microdrive_block_cartridge_name(
+  const libspectrum_microdrive *microdrive, size_t which );
+LIBSPECTRUM_API libspectrum_byte
+libspectrum_microdrive_block_header_checksum(
+  const libspectrum_microdrive *microdrive, size_t which );
+LIBSPECTRUM_API libspectrum_byte
+libspectrum_microdrive_block_record_flags(
+  const libspectrum_microdrive *microdrive, size_t which );
+LIBSPECTRUM_API libspectrum_byte
+libspectrum_microdrive_block_record_number(
+  const libspectrum_microdrive *microdrive, size_t which );
+LIBSPECTRUM_API libspectrum_word
+libspectrum_microdrive_block_record_length(
+  const libspectrum_microdrive *microdrive, size_t which );
+LIBSPECTRUM_API const libspectrum_byte*
+libspectrum_microdrive_block_record_name(
+  const libspectrum_microdrive *microdrive, size_t which );
+LIBSPECTRUM_API libspectrum_byte
+libspectrum_microdrive_block_record_checksum(
+  const libspectrum_microdrive *microdrive, size_t which );
+LIBSPECTRUM_API const libspectrum_byte*
+libspectrum_microdrive_block_data( const libspectrum_microdrive *microdrive,
+                                   size_t which );
+LIBSPECTRUM_API libspectrum_byte
+libspectrum_microdrive_block_data_checksum(
+  const libspectrum_microdrive *microdrive, size_t which );
 
 /* .mdr format routines */
 

@@ -1,4 +1,5 @@
 #include "test.h"
+#include "common.h"
 
 static test_edge_sequence_t
 complete_edges_list[] =
@@ -118,7 +119,7 @@ complete_tzx_file( void )
   return check_edges( DYNAMIC_TEST_PATH( "complete-tzx.tzx" ), complete_edges_list,
 		      LIBSPECTRUM_TAPE_FLAGS_STOP |
 		      LIBSPECTRUM_TAPE_FLAGS_STOP48 |
-		      LIBSPECTRUM_TAPE_FLAGS_NO_EDGE );
+		      TEST_TAPE_FLAGS_NO_EDGE );
 }
 
 static test_edge_sequence_t
@@ -145,11 +146,203 @@ zero_tail_length_pzx_file( void )
                       zero_tail_edges_list, 0x1ff );
 }
 
+static int
+same_edge( const libspectrum_tape_edge *a, const libspectrum_tape_edge *b )
+{
+  return a->tstates == b->tstates && a->level == b->level &&
+         a->transition == b->transition && a->flags == b->flags;
+}
+
+test_return_t
+tape_absolute_edge_levels_follow_tzx_and_pzx( void )
+{
+  static const libspectrum_dword pzx_tstates[] = { 855, 855, 0, 200, 200 };
+  static const libspectrum_tape_signal_level pzx_levels[] = {
+    LIBSPECTRUM_TAPE_SIGNAL_HIGH, LIBSPECTRUM_TAPE_SIGNAL_LOW,
+    LIBSPECTRUM_TAPE_SIGNAL_LOW, LIBSPECTRUM_TAPE_SIGNAL_HIGH,
+    LIBSPECTRUM_TAPE_SIGNAL_LOW
+  };
+  static const libspectrum_tape_transition pzx_transitions[] = {
+    LIBSPECTRUM_TAPE_TRANSITION_FORCE_HIGH,
+    LIBSPECTRUM_TAPE_TRANSITION_FORCE_LOW,
+    LIBSPECTRUM_TAPE_TRANSITION_NONE,
+    LIBSPECTRUM_TAPE_TRANSITION_FORCE_HIGH,
+    LIBSPECTRUM_TAPE_TRANSITION_FORCE_LOW
+  };
+  libspectrum_tape *tape = NULL;
+  libspectrum_tape_cursor *cursor = NULL;
+  libspectrum_tape_edge live, speculative;
+  libspectrum_tape_signal_level level;
+  size_t i;
+  test_return_t r;
+
+  r = load_tape( &tape, STATIC_TEST_PATH( "no-pilot-gdb.tzx" ),
+                 LIBSPECTRUM_ERROR_NONE );
+  if( r != TEST_PASS ) return r;
+  cursor = libspectrum_tape_cursor_capture( tape );
+  if( !cursor || libspectrum_tape_signal_level_get( &level, tape ) ||
+      level != LIBSPECTRUM_TAPE_SIGNAL_LOW ||
+      libspectrum_tape_get_next_edge( &live, tape ) ||
+      libspectrum_tape_cursor_get_next_edge( &speculative, cursor ) ||
+      !same_edge( &live, &speculative ) || live.tstates != 0 ||
+      live.level != LIBSPECTRUM_TAPE_SIGNAL_HIGH ||
+      live.transition != LIBSPECTRUM_TAPE_TRANSITION_FORCE_HIGH ) {
+    fprintf( stderr, "%s: TZX Set Signal Level absolute edge mismatch\n",
+             progname );
+    r = TEST_FAIL;
+    goto done;
+  }
+  {
+    libspectrum_tape_block *extra =
+      libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PAUSE );
+    speculative.tstates = 123; speculative.level = LIBSPECTRUM_TAPE_SIGNAL_LOW;
+    speculative.transition = LIBSPECTRUM_TAPE_TRANSITION_TOGGLE;
+    speculative.flags = 456;
+    if( !extra || libspectrum_tape_append_block( tape, extra ) ||
+        libspectrum_tape_cursor_get_next_edge( &speculative, cursor ) !=
+          LIBSPECTRUM_ERROR_INVALID || speculative.tstates != 123 ||
+        speculative.level != LIBSPECTRUM_TAPE_SIGNAL_LOW ||
+        speculative.transition != LIBSPECTRUM_TAPE_TRANSITION_TOGGLE ||
+        speculative.flags != 456 ) {
+      fprintf( stderr, "%s: failed cursor edge retrieval changed its result\n",
+               progname );
+      r = TEST_FAIL;
+      goto done;
+    }
+  }
+  libspectrum_tape_cursor_free( cursor ); cursor = NULL;
+  libspectrum_tape_free( tape ); tape = NULL;
+
+  r = load_tape( &tape, STATIC_TEST_PATH( "zero-tail.pzx" ),
+                 LIBSPECTRUM_ERROR_NONE );
+  if( r != TEST_PASS ) return r;
+  cursor = libspectrum_tape_cursor_capture( tape );
+  if( !cursor ) { r = TEST_INCOMPLETE; goto done; }
+  for( i = 0; i < sizeof( pzx_tstates ) / sizeof( pzx_tstates[0] ); i++ ) {
+    if( libspectrum_tape_get_next_edge( &live, tape ) ||
+        libspectrum_tape_cursor_get_next_edge( &speculative, cursor ) ||
+        !same_edge( &live, &speculative ) ||
+        live.tstates != pzx_tstates[i] || live.level != pzx_levels[i] ||
+        live.transition != pzx_transitions[i] ) {
+      fprintf( stderr, "%s: PZX absolute edge mismatch at %lu\n", progname,
+               (unsigned long)i );
+      r = TEST_FAIL;
+      goto done;
+    }
+  }
+  r = TEST_PASS;
+
+done:
+  if( cursor ) libspectrum_tape_cursor_free( cursor );
+  if( tape ) libspectrum_tape_free( tape );
+  return r;
+}
+
+test_return_t
+tape_signal_level_lifecycle_invariants( void )
+{
+  static const libspectrum_tape_type types[] = {
+    LIBSPECTRUM_TAPE_BLOCK_SET_SIGNAL_LEVEL,
+    LIBSPECTRUM_TAPE_BLOCK_PAUSE,
+    LIBSPECTRUM_TAPE_BLOCK_PURE_TONE,
+    LIBSPECTRUM_TAPE_BLOCK_PURE_TONE,
+    LIBSPECTRUM_TAPE_BLOCK_PAUSE,
+    LIBSPECTRUM_TAPE_BLOCK_PURE_TONE
+  };
+  static const libspectrum_tape_signal_level levels[] = {
+    LIBSPECTRUM_TAPE_SIGNAL_HIGH, LIBSPECTRUM_TAPE_SIGNAL_HIGH,
+    LIBSPECTRUM_TAPE_SIGNAL_LOW, LIBSPECTRUM_TAPE_SIGNAL_HIGH,
+    LIBSPECTRUM_TAPE_SIGNAL_HIGH, LIBSPECTRUM_TAPE_SIGNAL_LOW
+  };
+  static const libspectrum_tape_transition transitions[] = {
+    LIBSPECTRUM_TAPE_TRANSITION_FORCE_HIGH,
+    LIBSPECTRUM_TAPE_TRANSITION_NONE,
+    LIBSPECTRUM_TAPE_TRANSITION_TOGGLE,
+    LIBSPECTRUM_TAPE_TRANSITION_TOGGLE,
+    LIBSPECTRUM_TAPE_TRANSITION_FORCE_HIGH,
+    LIBSPECTRUM_TAPE_TRANSITION_FORCE_LOW
+  };
+  libspectrum_tape *tape = libspectrum_tape_alloc();
+  libspectrum_tape_block *blocks[6] = { NULL, NULL, NULL, NULL, NULL, NULL };
+  libspectrum_tape_edge edge;
+  libspectrum_tape_signal_level level;
+  size_t i, attached = 0;
+  test_return_t r = TEST_FAIL;
+
+  if( !tape ) return TEST_INCOMPLETE;
+  for( i = 0; i < sizeof( types ) / sizeof( types[0] ); i++ ) {
+    blocks[i] = libspectrum_tape_block_alloc( types[i] );
+    if( !blocks[i] ) { r = TEST_INCOMPLETE; goto done; }
+  }
+  libspectrum_tape_block_set_level( blocks[0], 1 );
+  libspectrum_tape_block_set_pause_tstates( blocks[1], 0 );
+  for( i = 2; i <= 3; i++ ) {
+    libspectrum_tape_block_set_pulse_length( blocks[i], 10 );
+    libspectrum_tape_block_set_count( blocks[i], 1 );
+  }
+  libspectrum_tape_block_set_pause_tstates( blocks[4], 100 );
+  libspectrum_tape_block_set_level( blocks[4], 1 );
+  libspectrum_tape_block_set_pulse_length( blocks[5], 10 );
+  libspectrum_tape_block_set_count( blocks[5], 1 );
+  for( i = 0; i < sizeof( blocks ) / sizeof( blocks[0] ); i++ ) {
+    if( libspectrum_tape_append_block( tape, blocks[i] ) ) goto done;
+    attached++;
+  }
+
+  if( libspectrum_tape_signal_level_get( &level, tape ) ||
+      level != LIBSPECTRUM_TAPE_SIGNAL_LOW ) goto mismatch;
+  for( i = 0; i < sizeof( levels ) / sizeof( levels[0] ); i++ ) {
+    if( libspectrum_tape_get_next_edge( &edge, tape ) ||
+        edge.level != levels[i] || edge.transition != transitions[i] ) {
+      fprintf( stderr, "%s: lifecycle edge %lu got level %d transition %d\n",
+               progname, (unsigned long)i, edge.level, edge.transition );
+      goto mismatch;
+    }
+  }
+  if( libspectrum_tape_signal_level_get( &level, tape ) ||
+      level != LIBSPECTRUM_TAPE_SIGNAL_LOW ) goto mismatch;
+
+  /* Both explicit seek APIs reset low and force the selected block's first
+     pulse low; neither inherits the preceding block's high level. */
+  if( libspectrum_tape_nth_block( tape, 2 ) ||
+      libspectrum_tape_signal_level_get( &level, tape ) ||
+      level != LIBSPECTRUM_TAPE_SIGNAL_LOW ||
+      libspectrum_tape_get_next_edge( &edge, tape ) ||
+      edge.level != LIBSPECTRUM_TAPE_SIGNAL_LOW ||
+      edge.transition != LIBSPECTRUM_TAPE_TRANSITION_FORCE_LOW ||
+      libspectrum_tape_nth_block( tape, 2 ) ||
+      !libspectrum_tape_select_next_block( tape ) ||
+      libspectrum_tape_signal_level_get( &level, tape ) ||
+      level != LIBSPECTRUM_TAPE_SIGNAL_LOW ||
+      libspectrum_tape_get_next_edge( &edge, tape ) ||
+      edge.transition != LIBSPECTRUM_TAPE_TRANSITION_FORCE_LOW )
+    goto mismatch;
+
+  if( libspectrum_tape_nth_block( tape, 0 ) ||
+      libspectrum_tape_get_next_edge( &edge, tape ) ||
+      edge.level != LIBSPECTRUM_TAPE_SIGNAL_HIGH ||
+      libspectrum_tape_clear( tape ) ||
+      libspectrum_tape_signal_level_get( &level, tape ) ||
+      level != LIBSPECTRUM_TAPE_SIGNAL_LOW ) goto mismatch;
+
+  r = TEST_PASS;
+  goto done;
+
+mismatch:
+  fprintf( stderr, "%s: tape signal-level lifecycle invariant failed\n",
+           progname );
+done:
+  for( i = attached; i < sizeof( blocks ) / sizeof( blocks[0] ); i++ )
+    if( blocks[i] ) libspectrum_tape_block_free( blocks[i] );
+  libspectrum_tape_free( tape );
+  return r;
+}
+
 static test_edge_sequence_t
 no_pilot_gdb_list[] =
 {
   /* Set signal level block */
-  {    0,   1,  17 },	/* Set signal level low, end of block */
+  {    0,   1,  33 },	/* Set signal level high, end of block */
 
   /* GDB with 0 tail */
   {  771,   1,   0 },	/* Byte 1, bit 1, pulse 1 */
@@ -247,8 +440,7 @@ trailing_pause_edges_list[] =
   { 0, 1, 8 },	/* 0ms Trailing pause End of block, no edge */
 
   /* 1s Pause block */
-  { 3500000, 1, 0 },	/* Pulse End of block, end of tape, stop the tape
-                           (should have an edge and not override the level) */
+  { 3500000, 1, 16 },	/* Low pulse; end of block, tape and playback */
 
   { -1, 0, 0 }		/* End marker */
 
@@ -259,7 +451,7 @@ trailing_pause_block_tzx_file( void )
 {
   return check_edges( STATIC_TEST_PATH( "trailing-pause-block.tzx" ),
                       trailing_pause_edges_list,
-                      LIBSPECTRUM_TAPE_FLAGS_NO_EDGE |
-                      LIBSPECTRUM_TAPE_FLAGS_LEVEL_LOW |
-                      LIBSPECTRUM_TAPE_FLAGS_LEVEL_HIGH );
+                      TEST_TAPE_FLAGS_NO_EDGE |
+                      TEST_TAPE_FLAGS_LEVEL_LOW |
+                      TEST_TAPE_FLAGS_LEVEL_HIGH );
 }

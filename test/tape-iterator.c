@@ -721,38 +721,6 @@ done:
 }
 
 /* libspectrum_tape_set_state updates the state of the current ROM block */
-test_return_t
-tape_set_state_updates_state_of_rom_block( void )
-{
-  libspectrum_tape *tape = NULL;
-  libspectrum_tape_state_type state;
-  test_return_t r = TEST_FAIL;
-
-  if( load_tape( &tape, STATIC_TEST_PATH( "standard-tap.tap" ),
-                 LIBSPECTRUM_ERROR_NONE ) != TEST_PASS )
-    return TEST_INCOMPLETE;
-
-  if( libspectrum_tape_set_state( tape, LIBSPECTRUM_TAPE_STATE_DATA1 ) ) {
-    fprintf( stderr, "%s: tape_set_state_updates_state_of_rom_block: "
-             "tape_set_state returned error\n", progname );
-    goto done;
-  }
-
-  state = libspectrum_tape_state( tape );
-
-  if( state != LIBSPECTRUM_TAPE_STATE_DATA1 ) {
-    fprintf( stderr, "%s: tape_set_state_updates_state_of_rom_block: "
-             "expected LIBSPECTRUM_TAPE_STATE_DATA1 (%d), got %d\n",
-             progname, LIBSPECTRUM_TAPE_STATE_DATA1, state );
-    goto done;
-  }
-
-  r = TEST_PASS;
-
-done:
-  libspectrum_tape_free( tape );
-  return r;
-}
 
 /* libspectrum_tape_current_block returns NULL on a tape with no current block */
 test_return_t
@@ -880,21 +848,6 @@ tape_state_on_fresh_tape_returns_invalid( void )
 }
 
 /* libspectrum_tape_block_free: free a standalone block */
-test_return_t
-tape_set_state_and_get_state_round_trip( void )
-{
-  libspectrum_tape_block *block;
-
-  block = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_ROM );
-  if( !block ) {
-    fprintf( stderr, "%s: tape_set_state_and_get_state_round_trip: "
-             "tape_block_alloc returned NULL\n", progname );
-    return TEST_FAIL;
-  }
-
-  libspectrum_tape_block_free( block );
-  return TEST_PASS;
-}
 
 /* libspectrum_tape_block_type returns the type set at allocation */
 test_return_t
@@ -1008,6 +961,472 @@ tape_count_returns_correct_count( void )
   r = TEST_PASS;
 
 done:
+  libspectrum_tape_free( tape );
+  return r;
+}
+
+/* Tape cursors advance independently and can be applied to their source tape. */
+test_return_t
+tape_cursor_advances_applies_and_invalidates( void )
+{
+  libspectrum_tape *tape = libspectrum_tape_alloc();
+  libspectrum_tape *other = libspectrum_tape_alloc();
+  libspectrum_tape_cursor *cursor = NULL, *clone = NULL, *invalidated = NULL;
+  libspectrum_tape_block *b1, *b2, *b3;
+  libspectrum_dword tstates;
+  int flags, tape_pos, cursor_pos, signal_level;
+  libspectrum_tape_state_type state;
+  test_return_t r = TEST_FAIL;
+
+  if( !tape || !other ) return TEST_INCOMPLETE;
+
+  b1 = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PURE_TONE );
+  b2 = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PURE_TONE );
+  b3 = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PAUSE );
+  if( !b1 || !b2 || !b3 ) goto done;
+
+  libspectrum_tape_block_set_count( b1, 1 );
+  libspectrum_tape_block_set_pulse_length( b1, 100 );
+  libspectrum_tape_block_set_count( b2, 1 );
+  libspectrum_tape_block_set_pulse_length( b2, 200 );
+  libspectrum_tape_append_block( tape, b1 );
+  libspectrum_tape_append_block( tape, b2 );
+
+  cursor = test_tape_cursor_capture( tape, 0 );
+  if( !cursor ) goto done;
+
+  if( test_tape_cursor_get_next_edge( &tstates, &flags, cursor ) ||
+      tstates != 100 || !( flags & LIBSPECTRUM_TAPE_FLAGS_BLOCK ) ) {
+    fprintf( stderr, "%s: tape cursor did not return the first block edge\n",
+             progname );
+    goto done;
+  }
+  if( libspectrum_tape_cursor_position( &cursor_pos, cursor ) ||
+      cursor_pos != 1 ||
+      test_tape_cursor_signal_level( &signal_level, cursor ) ||
+      signal_level != 0 ) {
+    fprintf( stderr, "%s: tape cursor position or signal level is wrong\n",
+             progname );
+    goto done;
+  }
+  if( libspectrum_tape_position( &tape_pos, tape ) || tape_pos != 0 ) {
+    fprintf( stderr, "%s: tape cursor changed source position to %d\n",
+             progname, tape_pos );
+    goto done;
+  }
+
+  clone = libspectrum_tape_cursor_clone( cursor );
+  if( !clone || libspectrum_tape_cursor_position( &cursor_pos, clone ) ||
+      cursor_pos != 1 ) {
+    fprintf( stderr, "%s: tape cursor clone did not preserve position\n",
+             progname );
+    goto done;
+  }
+  if( test_tape_cursor_apply( other, &signal_level, cursor ) !=
+      LIBSPECTRUM_ERROR_INVALID ) {
+    fprintf( stderr, "%s: tape cursor applied to the wrong tape\n", progname );
+    goto done;
+  }
+  if( test_tape_cursor_apply( tape, &signal_level, cursor ) ||
+      signal_level != 0 || libspectrum_tape_position( &tape_pos, tape ) ||
+      tape_pos != 1 ) {
+    fprintf( stderr, "%s: applied tape cursor state is wrong\n", progname );
+    goto done;
+  }
+
+  invalidated = test_tape_cursor_capture( tape, signal_level );
+  if( !invalidated ) goto done;
+  libspectrum_tape_append_block( tape, b3 );
+  b3 = NULL;
+  if( test_tape_cursor_get_next_edge( &tstates, &flags, invalidated ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      libspectrum_tape_cursor_position( &cursor_pos, invalidated ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      libspectrum_tape_cursor_state( &state, invalidated ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      test_tape_cursor_signal_level( &signal_level, invalidated ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      test_tape_cursor_apply( tape, &signal_level, invalidated ) !=
+        LIBSPECTRUM_ERROR_INVALID ) {
+    fprintf( stderr, "%s: structurally invalidated tape cursor was accepted\n",
+             progname );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+done:
+  if( cursor ) libspectrum_tape_cursor_free( cursor );
+  if( clone ) libspectrum_tape_cursor_free( clone );
+  if( invalidated ) libspectrum_tape_cursor_free( invalidated );
+  if( b3 ) libspectrum_tape_block_free( b3 );
+  libspectrum_tape_free( tape );
+  libspectrum_tape_free( other );
+  return r;
+}
+
+/* Every successful mutation of a source block invalidates existing cursors. */
+test_return_t
+tape_cursor_detects_block_mutations( void )
+{
+  libspectrum_tape *tape = libspectrum_tape_alloc();
+  libspectrum_tape_cursor *cursor = NULL, *clone = NULL;
+  libspectrum_tape_block *blocks[4], *external = NULL;
+  libspectrum_dword *old_lengths, *new_lengths;
+  libspectrum_dword tstates;
+  libspectrum_tape_state_type state;
+  int flags, pos, signal_level;
+  size_t i;
+  test_return_t r = TEST_FAIL;
+
+  if( !tape ) return TEST_INCOMPLETE;
+
+  blocks[0] = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PURE_TONE );
+  blocks[1] = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PURE_TONE );
+  blocks[2] = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PULSES );
+  blocks[3] = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_JUMP );
+  external = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PAUSE );
+  for( i = 0; i < 4; i++ ) if( !blocks[i] ) goto done;
+  if( !external ) goto done;
+
+  old_lengths = libspectrum_new( libspectrum_dword, 1 );
+  old_lengths[0] = 300;
+  libspectrum_tape_block_set_count( blocks[0], 1 );
+  libspectrum_tape_block_set_pulse_length( blocks[0], 100 );
+  libspectrum_tape_block_set_count( blocks[1], 1 );
+  libspectrum_tape_block_set_pulse_length( blocks[1], 200 );
+  libspectrum_tape_block_set_count( blocks[2], 1 );
+  libspectrum_tape_block_set_pulse_lengths( blocks[2], old_lengths );
+  libspectrum_tape_block_set_offset( blocks[3], 0 );
+  for( i = 0; i < 3; i++ ) libspectrum_tape_append_block( tape, blocks[i] );
+  if( libspectrum_tape_insert_block( tape, blocks[3], 3 ) ) goto done;
+
+  /* A generated scalar setter on the current block invalidates every cursor
+     operation, before the copied playback state can be used. */
+  cursor = test_tape_cursor_capture( tape, 0 );
+  if( !cursor ) goto done;
+  libspectrum_tape_block_set_count( blocks[0], 2 );
+  if( test_tape_cursor_get_next_edge( &tstates, &flags, cursor ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      libspectrum_tape_cursor_position( &pos, cursor ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      libspectrum_tape_cursor_state( &state, cursor ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      test_tape_cursor_signal_level( &signal_level, cursor ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      test_tape_cursor_apply( tape, &signal_level, cursor ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      libspectrum_tape_cursor_clone( cursor ) != NULL ) {
+    fprintf( stderr, "%s: current-block scalar mutation was accepted\n",
+             progname );
+    goto done;
+  }
+  libspectrum_tape_cursor_free( cursor ); cursor = NULL;
+
+  /* Strict snapshots include future blocks, not only pointers already reached
+     by playback. */
+  libspectrum_tape_nth_block( tape, 0 );
+  cursor = test_tape_cursor_capture( tape, 0 );
+  if( !cursor ) goto done;
+  libspectrum_tape_block_set_pulse_length( blocks[1], 201 );
+  if( test_tape_cursor_get_next_edge( &tstates, &flags, cursor ) !=
+      LIBSPECTRUM_ERROR_INVALID ) {
+    fprintf( stderr, "%s: future-block mutation was accepted\n", progname );
+    goto done;
+  }
+  libspectrum_tape_cursor_free( cursor ); cursor = NULL;
+
+  /* Control-flow setters are covered even when that block is not reachable
+     from the cursor's current path. */
+  cursor = test_tape_cursor_capture( tape, 0 );
+  if( !cursor ) goto done;
+  libspectrum_tape_block_set_offset( blocks[3], -1 );
+  if( test_tape_cursor_signal_level( &signal_level, cursor ) !=
+      LIBSPECTRUM_ERROR_INVALID ) {
+    fprintf( stderr, "%s: control-flow mutation was accepted\n", progname );
+    goto done;
+  }
+  libspectrum_tape_cursor_free( cursor ); cursor = NULL;
+
+  /* A pointer-replacing setter may let the caller immediately free the old
+     allocation. Both the original cursor and its clone must reject it
+     without consulting that stale pointer. */
+  libspectrum_tape_nth_block( tape, 2 );
+  cursor = test_tape_cursor_capture( tape, 0 );
+  if( !cursor ) goto done;
+  clone = libspectrum_tape_cursor_clone( cursor );
+  if( !clone ) goto done;
+  new_lengths = libspectrum_new( libspectrum_dword, 1 );
+  new_lengths[0] = 301;
+  libspectrum_tape_block_set_pulse_lengths( blocks[2], new_lengths );
+  libspectrum_free( old_lengths );
+  old_lengths = NULL;
+  if( test_tape_cursor_get_next_edge( &tstates, &flags, cursor ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      test_tape_cursor_get_next_edge( &tstates, &flags, clone ) !=
+        LIBSPECTRUM_ERROR_INVALID ) {
+    fprintf( stderr, "%s: pointer mutation was accepted by cursor or clone\n",
+             progname );
+    goto done;
+  }
+  libspectrum_tape_cursor_free( cursor ); cursor = NULL;
+  libspectrum_tape_cursor_free( clone ); clone = NULL;
+
+  /* Mutating a block which is not in the source tape is unrelated and does
+     not invalidate the cursor. */
+  cursor = test_tape_cursor_capture( tape, 0 );
+  if( !cursor ) goto done;
+  libspectrum_tape_block_set_type( external,
+                                   LIBSPECTRUM_TAPE_BLOCK_PURE_TONE );
+  if( libspectrum_tape_cursor_position( &pos, cursor ) || pos != 2 ||
+      test_tape_cursor_signal_level( &signal_level, cursor ) ||
+      signal_level != 0 ) {
+    fprintf( stderr, "%s: unrelated block mutation invalidated cursor\n",
+             progname );
+    goto done;
+  }
+  libspectrum_tape_cursor_free( cursor ); cursor = NULL;
+
+  /* set_type is the only hand-written public block setter. */
+  cursor = test_tape_cursor_capture( tape, 0 );
+  if( !cursor ) goto done;
+  libspectrum_tape_block_set_type( blocks[3], LIBSPECTRUM_TAPE_BLOCK_PAUSE );
+  if( test_tape_cursor_apply( tape, &signal_level, cursor ) !=
+      LIBSPECTRUM_ERROR_INVALID ) {
+    fprintf( stderr, "%s: block type mutation was accepted\n", progname );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+done:
+  if( cursor ) libspectrum_tape_cursor_free( cursor );
+  if( clone ) libspectrum_tape_cursor_free( clone );
+  if( external ) libspectrum_tape_block_free( external );
+  libspectrum_tape_free( tape );
+  return r;
+}
+
+/* A block cannot be attached to the same or a second tape more than once. */
+test_return_t
+tape_rejects_duplicate_block_ownership( void )
+{
+  libspectrum_tape *tape1 = libspectrum_tape_alloc();
+  libspectrum_tape *tape2 = libspectrum_tape_alloc();
+  libspectrum_tape_cursor *cursor1 = NULL, *cursor2 = NULL;
+  libspectrum_tape_block *block;
+  int block_attached = 0, signal_level;
+  test_return_t r = TEST_FAIL;
+
+  if( !tape1 || !tape2 ) return TEST_INCOMPLETE;
+
+  block = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PURE_TONE );
+  if( !block ) goto done;
+  libspectrum_tape_block_set_count( block, 1 );
+  libspectrum_tape_block_set_pulse_length( block, 100 );
+  if( libspectrum_tape_append_block( NULL, block ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      libspectrum_tape_append_block( tape1, NULL ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      libspectrum_tape_insert_block( tape2, NULL, 0 ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      libspectrum_tape_count( tape1 ) != 0 ||
+      libspectrum_tape_count( tape2 ) != 0 ) {
+    fprintf( stderr, "%s: NULL attachment changed a tape or block\n",
+             progname );
+    goto done;
+  }
+  if( libspectrum_tape_append_block( tape1, block ) ) goto done;
+  block_attached = 1;
+
+  cursor1 = test_tape_cursor_capture( tape1, 0 );
+  cursor2 = test_tape_cursor_capture( tape2, 1 );
+  if( !cursor1 || !cursor2 ) goto done;
+
+  /* Append must reject both same-tape and cross-tape duplication without
+     changing either tape. */
+  if( libspectrum_tape_append_block( tape1, block ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      libspectrum_tape_append_block( tape2, block ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      libspectrum_tape_count( tape1 ) != 1 ||
+      libspectrum_tape_count( tape2 ) != 0 ||
+      test_tape_cursor_signal_level( &signal_level, cursor1 ) ||
+      signal_level != 0 ||
+      test_tape_cursor_signal_level( &signal_level, cursor2 ) ||
+      signal_level != 0 ) {
+    fprintf( stderr, "%s: rejected append changed a tape or cursor\n",
+             progname );
+    goto done;
+  }
+
+  if( libspectrum_tape_insert_block( tape2, block, 0 ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      libspectrum_tape_count( tape1 ) != 1 ||
+      libspectrum_tape_count( tape2 ) != 0 ||
+      test_tape_cursor_signal_level( &signal_level, cursor1 ) ||
+      test_tape_cursor_signal_level( &signal_level, cursor2 ) ) {
+    fprintf( stderr, "%s: rejected insert changed a tape or cursor\n",
+             progname );
+    goto done;
+  }
+
+  /* Rejection must not overwrite the original owner. */
+  libspectrum_tape_block_set_count( block, 2 );
+  if( test_tape_cursor_signal_level( &signal_level, cursor1 ) !=
+        LIBSPECTRUM_ERROR_INVALID ||
+      test_tape_cursor_signal_level( &signal_level, cursor2 ) ) {
+    fprintf( stderr, "%s: rejected attachment changed block ownership\n",
+             progname );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+done:
+  if( cursor1 ) libspectrum_tape_cursor_free( cursor1 );
+  if( cursor2 ) libspectrum_tape_cursor_free( cursor2 );
+  if( block && !block_attached ) libspectrum_tape_block_free( block );
+  libspectrum_tape_free( tape2 );
+  libspectrum_tape_free( tape1 );
+  return r;
+}
+
+/* Tape cursors can represent partial and complete standard ROM data. */
+test_return_t
+tape_cursor_tracks_partial_and_full_rom_blocks( void )
+{
+  libspectrum_tape *tape = libspectrum_tape_alloc();
+  libspectrum_tape_cursor *partial = NULL, *full = NULL;
+  libspectrum_tape_block *rom, *following;
+  libspectrum_tape_state_type state;
+  libspectrum_byte *data;
+  libspectrum_dword tstates;
+  size_t i, pilot_edges = 3223;
+  int flags, pos, signal_level;
+  test_return_t r = TEST_FAIL;
+
+  if( !tape ) return TEST_INCOMPLETE;
+
+  rom = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_ROM );
+  following = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PAUSE );
+  if( !rom || !following ) goto done;
+
+  data = libspectrum_malloc( 2 );
+  data[0] = 0x80; data[1] = 0x00;
+  libspectrum_tape_block_set_data_length( rom, 2 );
+  libspectrum_tape_block_set_data( rom, data );
+  libspectrum_tape_block_set_pause_tstates( rom, 3500000 );
+  libspectrum_tape_append_block( tape, rom );
+  libspectrum_tape_append_block( tape, following );
+
+  partial = test_tape_cursor_capture( tape, 0 );
+  full = test_tape_cursor_capture( tape, 0 );
+  if( !partial || !full ) goto done;
+
+  /* Data-flag blocks have 3223 pilot edges, two sync edges and sixteen
+     edges per complete byte. */
+  for( i = 0; i < pilot_edges + 2 + 16; i++ ) {
+    if( test_tape_cursor_get_next_edge( &tstates, &flags, partial ) )
+      goto done;
+  }
+  if( libspectrum_tape_cursor_state( &state, partial ) ||
+      state != LIBSPECTRUM_TAPE_STATE_DATA1 ||
+      test_tape_cursor_apply( tape, &signal_level, partial ) ||
+      signal_level != 0 ||
+      libspectrum_tape_state( tape ) != LIBSPECTRUM_TAPE_STATE_DATA1 ) {
+    fprintf( stderr, "%s: partial ROM cursor did not resume at next byte\n",
+             progname );
+    goto done;
+  }
+  if( test_tape_get_next_edge( &tstates, &flags, tape ) ||
+      tstates != 855 ) {
+    fprintf( stderr, "%s: partial ROM cursor returned wrong next edge\n",
+             progname );
+    goto done;
+  }
+
+  /* Generic edge traversal reaches the trailing pause and records its
+     post-data handoff polarity as part of the complete cursor state. */
+  for( i = 0; i < pilot_edges + 2 + 32; i++ ) {
+    if( test_tape_cursor_get_next_edge( &tstates, &flags, full ) )
+      goto done;
+  }
+  if( libspectrum_tape_cursor_state( &state, full ) ||
+      state != LIBSPECTRUM_TAPE_STATE_PAUSE ||
+      test_tape_cursor_apply( tape, &signal_level, full ) ||
+      signal_level != 0 ||
+      libspectrum_tape_state( tape ) != LIBSPECTRUM_TAPE_STATE_PAUSE ) {
+    fprintf( stderr, "%s: full ROM cursor did not reach trailing pause\n",
+             progname );
+    goto done;
+  }
+  if( test_tape_get_next_edge( &tstates, &flags, tape ) ||
+      tstates != 3500000 || !( flags & LIBSPECTRUM_TAPE_FLAGS_BLOCK ) ||
+      libspectrum_tape_position( &pos, tape ) || pos != 1 ) {
+    fprintf( stderr, "%s: full ROM cursor did not preserve block transition\n",
+             progname );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+done:
+  if( partial ) libspectrum_tape_cursor_free( partial );
+  if( full ) libspectrum_tape_cursor_free( full );
+  libspectrum_tape_free( tape );
+  return r;
+}
+
+/* Cursor control flow must not modify the source tape. */
+test_return_t
+tape_cursor_processes_jump_and_loop_blocks( void )
+{
+  libspectrum_tape *tape = libspectrum_tape_alloc();
+  libspectrum_tape_cursor *cursor = NULL;
+  libspectrum_tape_block *blocks[6];
+  libspectrum_dword tstates;
+  int flags, tape_pos, cursor_pos, i;
+  test_return_t r = TEST_FAIL;
+
+  if( !tape ) return TEST_INCOMPLETE;
+
+  blocks[0] = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_JUMP );
+  blocks[1] = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PAUSE );
+  blocks[2] = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_LOOP_START );
+  blocks[3] = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PURE_TONE );
+  blocks[4] = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_LOOP_END );
+  blocks[5] = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PURE_TONE );
+  for( i = 0; i < 6; i++ ) if( !blocks[i] ) goto done;
+
+  libspectrum_tape_block_set_offset( blocks[0], 2 );
+  libspectrum_tape_block_set_count( blocks[2], 2 );
+  libspectrum_tape_block_set_count( blocks[3], 1 );
+  libspectrum_tape_block_set_pulse_length( blocks[3], 100 );
+  libspectrum_tape_block_set_count( blocks[5], 1 );
+  libspectrum_tape_block_set_pulse_length( blocks[5], 200 );
+  for( i = 0; i < 6; i++ ) libspectrum_tape_append_block( tape, blocks[i] );
+
+  cursor = test_tape_cursor_capture( tape, 0 );
+  if( !cursor ) goto done;
+
+  /* Jump to loop start, execute the one-pulse body twice, then continue. */
+  for( i = 0; i < 6; i++ ) {
+    if( test_tape_cursor_get_next_edge( &tstates, &flags, cursor ) )
+      goto done;
+  }
+  if( libspectrum_tape_cursor_position( &cursor_pos, cursor ) ||
+      cursor_pos != 5 || libspectrum_tape_position( &tape_pos, tape ) ||
+      tape_pos != 0 ) {
+    fprintf( stderr, "%s: cursor jump/loop changed the wrong playback state\n",
+             progname );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+done:
+  if( cursor ) libspectrum_tape_cursor_free( cursor );
   libspectrum_tape_free( tape );
   return r;
 }

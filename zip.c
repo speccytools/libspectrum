@@ -476,7 +476,7 @@ prepare_stream( struct libspectrum_zip *z )
 /* Decompress the zlib compressed data */
 static libspectrum_error
 decompress_stream( struct libspectrum_zip *z, libspectrum_byte **buffer,
-                   size_t *buffer_size )
+                   size_t *buffer_size, size_t max_buffer_size )
 {
   libspectrum_error error;
   size_t file_compressed_left;
@@ -497,7 +497,7 @@ decompress_stream( struct libspectrum_zip *z, libspectrum_byte **buffer,
   }
 
   error = libspectrum_zip_inflate( z->ptr, file_compressed_left, buffer,
-                                   buffer_size );
+                                   buffer_size, max_buffer_size );
   if( error ) return error;
 
   z->ptr += file_compressed_left;
@@ -508,7 +508,7 @@ decompress_stream( struct libspectrum_zip *z, libspectrum_byte **buffer,
 /* Read file from ZIP archive */
 libspectrum_error
 libspectrum_zip_read( struct libspectrum_zip *z, libspectrum_byte **buffer,
-                      size_t *size )
+                      size_t *size, size_t max_size )
 {
   const libspectrum_byte *last = z->ptr;
   libspectrum_error error;
@@ -528,6 +528,13 @@ libspectrum_zip_read( struct libspectrum_zip *z, libspectrum_byte **buffer,
     return LIBSPECTRUM_ERROR_UNKNOWN;
   }
 
+  if( *size > max_size ) {
+    *size = 0;
+    libspectrum_print_error( LIBSPECTRUM_ERROR_LIMIT,
+                             "ZIP entry exceeds size limit" );
+    return LIBSPECTRUM_ERROR_LIMIT;
+  }
+
   /* Now read the data depending on the compression method used */
   compression = z->file_info.compression;
 
@@ -540,10 +547,12 @@ libspectrum_zip_read( struct libspectrum_zip *z, libspectrum_byte **buffer,
     break;
 
   case 8: /* deflate */
-    if( decompress_stream( z, buffer, size ) ) {
+    error = decompress_stream( z, buffer, size, max_size );
+    if( error ) {
+      z->ptr = last;
+      if( error == LIBSPECTRUM_ERROR_LIMIT ) return error;
       libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,
                                "ZIP decompression failed" );
-      z->ptr = last;
       return LIBSPECTRUM_ERROR_CORRUPT;
     }
     break;
@@ -572,7 +581,8 @@ libspectrum_zip_read( struct libspectrum_zip *z, libspectrum_byte **buffer,
 /* Make 'best guesses' as to what to uncompress from the archive */
 libspectrum_error
 libspectrum_zip_blind_read( const libspectrum_byte *zipptr, size_t ziplength,
-                            libspectrum_byte **outptr, size_t *outlength )
+                            libspectrum_byte **outptr, size_t *outlength,
+                            size_t max_outlength )
 {
   struct libspectrum_zip *z;
   zip_stat info;
@@ -600,7 +610,7 @@ libspectrum_zip_blind_read( const libspectrum_byte *zipptr, size_t ziplength,
         class != LIBSPECTRUM_CLASS_COMPRESSED &&
         class != LIBSPECTRUM_CLASS_AUXILIARY ) {
 
-      error = libspectrum_zip_read( z, outptr, outlength );
+      error = libspectrum_zip_read( z, outptr, outlength, max_outlength );
       libspectrum_zip_close( z );
 
       return error;

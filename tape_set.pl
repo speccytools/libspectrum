@@ -72,6 +72,7 @@ sub trailer ($) {
       return LIBSPECTRUM_ERROR_INVALID;
   }
 
+  libspectrum_tape_block_changed( block );
   return LIBSPECTRUM_ERROR_NONE;
 }
 

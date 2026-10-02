@@ -38,15 +38,15 @@ tzx_turbo_data_with_zero_pilot_pulses_and_zero_data( void )
 
   libspectrum_free( buffer );
 
-  if( libspectrum_tape_get_next_edge( &tstates, &flags, tape ) ) {
+  if( test_tape_get_next_edge( &tstates, &flags, tape ) ) {
     libspectrum_tape_free( tape );
     return TEST_INCOMPLETE;
   }
 
-  if( flags != LIBSPECTRUM_TAPE_FLAGS_LEVEL_LOW ) {
+  if( flags != TEST_TAPE_FLAGS_LEVEL_LOW ) {
     fprintf( stderr,
              "%s: reading first edge of `%s' gave unexpected flags 0x%04x; expected 0x%04x\n",
-	     progname, filename, flags, LIBSPECTRUM_TAPE_FLAGS_LEVEL_LOW );
+	     progname, filename, flags, TEST_TAPE_FLAGS_LEVEL_LOW );
     libspectrum_tape_free( tape );
     return TEST_FAIL;
   }
@@ -165,7 +165,7 @@ tzx_loop_end_block_with_loop_start_block( void )
 
   libspectrum_free( buffer );
 
-  if( libspectrum_tape_get_next_edge( &tstates, &flags, tape ) ) {
+  if( test_tape_get_next_edge( &tstates, &flags, tape ) ) {
     libspectrum_tape_free( tape );
     return TEST_INCOMPLETE;
   }
@@ -1339,6 +1339,127 @@ done:
   libspectrum_free( bit0_pulses );
   libspectrum_free( bit1_pulses );
   libspectrum_tape_block_free( block );
+  return r;
+}
+
+static libspectrum_tape_block *
+make_pzx_style_data_block( int level, libspectrum_word pulse_length,
+                           size_t pulse_count )
+{
+  libspectrum_tape_block *block =
+    libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_DATA_BLOCK );
+  libspectrum_word *bit0 = libspectrum_new( libspectrum_word, pulse_count );
+  libspectrum_word *bit1 = libspectrum_new( libspectrum_word, pulse_count );
+  libspectrum_byte *data = libspectrum_new( libspectrum_byte, 1 );
+  size_t i;
+
+  for( i = 0; i < pulse_count; i++ ) {
+    bit0[i] = pulse_length;
+    bit1[i] = pulse_length + 1;
+  }
+  data[0] = 0;
+  libspectrum_tape_block_set_count( block, 1 );
+  libspectrum_tape_block_set_level( block, level );
+  libspectrum_tape_block_set_tail_length( block, 0 );
+  libspectrum_tape_block_set_bit0_pulse_count( block, pulse_count );
+  libspectrum_tape_block_set_bit0_pulses( block, bit0 );
+  libspectrum_tape_block_set_bit1_pulse_count( block, pulse_count );
+  libspectrum_tape_block_set_bit1_pulses( block, bit1 );
+  libspectrum_tape_block_set_data_length( block, 1 );
+  libspectrum_tape_block_set_bits_in_last_byte( block, 1 );
+  libspectrum_tape_block_set_data( block, data );
+  return block;
+}
+
+/* PZX stores the level of the first pulse in each block, whereas TZX pulse
+   blocks make an edge from the current level.  Check that TZX writing emits
+   the opposite pre-edge level for PULS, DATA and high PAUS blocks, while an
+   explicit Set Signal Level block remains literal. */
+test_return_t
+tzx_write_preserves_pzx_style_initial_pulse_levels( void )
+{
+  static const libspectrum_dword expected_tstates[] = {
+    0, 100, 0, 200, 200, 0, 0, 250, 0, 0, 300, 300, 0, 3500, 0, 400, 0
+  };
+  static const libspectrum_tape_signal_level expected_levels[] = {
+    LIBSPECTRUM_TAPE_SIGNAL_HIGH, LIBSPECTRUM_TAPE_SIGNAL_LOW,
+    LIBSPECTRUM_TAPE_SIGNAL_LOW, LIBSPECTRUM_TAPE_SIGNAL_HIGH,
+    LIBSPECTRUM_TAPE_SIGNAL_LOW, LIBSPECTRUM_TAPE_SIGNAL_LOW,
+    LIBSPECTRUM_TAPE_SIGNAL_LOW, LIBSPECTRUM_TAPE_SIGNAL_HIGH,
+    LIBSPECTRUM_TAPE_SIGNAL_HIGH, LIBSPECTRUM_TAPE_SIGNAL_HIGH,
+    LIBSPECTRUM_TAPE_SIGNAL_LOW, LIBSPECTRUM_TAPE_SIGNAL_HIGH,
+    LIBSPECTRUM_TAPE_SIGNAL_HIGH, LIBSPECTRUM_TAPE_SIGNAL_LOW,
+    LIBSPECTRUM_TAPE_SIGNAL_LOW,
+    LIBSPECTRUM_TAPE_SIGNAL_HIGH, LIBSPECTRUM_TAPE_SIGNAL_HIGH
+  };
+  libspectrum_tape *source = NULL, *roundtrip = NULL;
+  libspectrum_tape_block *block;
+  libspectrum_dword *lengths;
+  size_t *repeats, length = 0, i;
+  libspectrum_byte *output = NULL;
+  libspectrum_tape_edge edge;
+  test_return_t r = TEST_INCOMPLETE;
+
+  source = libspectrum_tape_alloc();
+  roundtrip = libspectrum_tape_alloc();
+  if( !source || !roundtrip ) goto done;
+
+  block = libspectrum_tape_block_alloc(
+    LIBSPECTRUM_TAPE_BLOCK_PULSE_SEQUENCE );
+  lengths = libspectrum_new( libspectrum_dword, 1 );
+  repeats = libspectrum_new( size_t, 1 );
+  lengths[0] = 100; repeats[0] = 1;
+  libspectrum_tape_block_set_count( block, 1 );
+  libspectrum_tape_block_set_pulse_lengths( block, lengths );
+  libspectrum_tape_block_set_pulse_repeats( block, repeats );
+  if( libspectrum_tape_append_block( source, block ) ) goto done;
+
+  block = make_pzx_style_data_block( 1, 200, 2 );
+  if( libspectrum_tape_append_block( source, block ) ) goto done;
+  block = make_pzx_style_data_block( 1, 250, 1 );
+  if( libspectrum_tape_append_block( source, block ) ) goto done;
+  block = make_pzx_style_data_block( 0, 300, 2 );
+  if( libspectrum_tape_append_block( source, block ) ) goto done;
+
+  block = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PAUSE );
+  libspectrum_tape_block_set_level( block, 0 );
+  libspectrum_set_pause_tstates( block, 3500 );
+  if( libspectrum_tape_append_block( source, block ) ) goto done;
+
+  block = libspectrum_tape_block_alloc( LIBSPECTRUM_TAPE_BLOCK_PAUSE );
+  libspectrum_tape_block_set_level( block, 1 );
+  libspectrum_set_pause_tstates( block, 400 );
+  if( libspectrum_tape_append_block( source, block ) ) goto done;
+
+  block = libspectrum_tape_block_alloc(
+    LIBSPECTRUM_TAPE_BLOCK_SET_SIGNAL_LEVEL );
+  libspectrum_tape_block_set_level( block, 1 );
+  if( libspectrum_tape_append_block( source, block ) ) goto done;
+
+  if( libspectrum_tape_write( &output, &length, source,
+                              LIBSPECTRUM_ID_TAPE_TZX ) ||
+      libspectrum_tape_read( roundtrip, output, length,
+                             LIBSPECTRUM_ID_TAPE_TZX, NULL ) ) goto done;
+
+  r = TEST_FAIL;
+  for( i = 0; i < sizeof( expected_tstates ) / sizeof( expected_tstates[0] );
+       i++ ) {
+    if( libspectrum_tape_get_next_edge( &edge, roundtrip ) ||
+        edge.tstates != expected_tstates[i] ||
+        edge.level != expected_levels[i] ) {
+      fprintf( stderr, "%s: TZX PZX-style initial level mismatch at edge %lu"
+               " (expected %lu/%d, got %lu/%d)\n", progname,
+               (unsigned long)i, (unsigned long)expected_tstates[i],
+               expected_levels[i], (unsigned long)edge.tstates, edge.level );
+      goto done;
+    }
+  }
+  r = TEST_PASS;
+
+done:
+  libspectrum_free( output );
+  if( roundtrip ) libspectrum_tape_free( roundtrip );
+  if( source ) libspectrum_tape_free( source );
   return r;
 }
 

@@ -496,10 +496,7 @@ read_rom_block( libspectrum_tape *tape, const libspectrum_byte *ptr,
   libspectrum_set_pause_ms( block, 1000 );
 
   /* Put the block into the block list */
-  libspectrum_tape_append_block( tape, block );
-
-  /* And return with no error */
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -605,10 +602,10 @@ read_raw_data( libspectrum_tape *tape, const libspectrum_byte *ptr,
     libspectrum_tape_block_free( block );
   } else {
     /* Put the block into the block list */
-    libspectrum_tape_append_block( tape, block );
+    error = libspectrum_tape_append_block( tape, block );
+    if( error ) return error;
   }
 
-  /* And return with no error */
   return LIBSPECTRUM_ERROR_NONE;
 }
 

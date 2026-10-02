@@ -118,6 +118,116 @@ libspectrum_microdrive_set_cartridge_len( libspectrum_microdrive *microdrive,
   microdrive->cartridge_len = len;
 }
 
+static const libspectrum_byte*
+get_block_data( const libspectrum_microdrive *microdrive, size_t which )
+{
+  if( !microdrive || which >= microdrive->cartridge_len ) return NULL;
+
+  return microdrive->data + which * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN;
+}
+
+size_t
+libspectrum_microdrive_block_count( const libspectrum_microdrive *microdrive )
+{
+  return microdrive ? microdrive->cartridge_len : 0;
+}
+
+libspectrum_byte
+libspectrum_microdrive_block_header_flag(
+  const libspectrum_microdrive *microdrive, size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block[0] : 0;
+}
+
+libspectrum_byte
+libspectrum_microdrive_block_number( const libspectrum_microdrive *microdrive,
+                                     size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block[1] : 0;
+}
+
+libspectrum_word
+libspectrum_microdrive_block_header_unused(
+  const libspectrum_microdrive *microdrive, size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block[2] | ( block[3] << 8 ) : 0;
+}
+
+const libspectrum_byte*
+libspectrum_microdrive_block_cartridge_name(
+  const libspectrum_microdrive *microdrive, size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block + 4 : NULL;
+}
+
+libspectrum_byte
+libspectrum_microdrive_block_header_checksum(
+  const libspectrum_microdrive *microdrive, size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block[14] : 0;
+}
+
+libspectrum_byte
+libspectrum_microdrive_block_record_flags(
+  const libspectrum_microdrive *microdrive, size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block[15] : 0;
+}
+
+libspectrum_byte
+libspectrum_microdrive_block_record_number(
+  const libspectrum_microdrive *microdrive, size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block[16] : 0;
+}
+
+libspectrum_word
+libspectrum_microdrive_block_record_length(
+  const libspectrum_microdrive *microdrive, size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block[17] | ( block[18] << 8 ) : 0;
+}
+
+const libspectrum_byte*
+libspectrum_microdrive_block_record_name(
+  const libspectrum_microdrive *microdrive, size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block + 19 : NULL;
+}
+
+libspectrum_byte
+libspectrum_microdrive_block_record_checksum(
+  const libspectrum_microdrive *microdrive, size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block[29] : 0;
+}
+
+const libspectrum_byte*
+libspectrum_microdrive_block_data( const libspectrum_microdrive *microdrive,
+                                   size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block + 30 : NULL;
+}
+
+libspectrum_byte
+libspectrum_microdrive_block_data_checksum(
+  const libspectrum_microdrive *microdrive, size_t which )
+{
+  const libspectrum_byte *block = get_block_data( microdrive, which );
+  return block ? block[542] : 0;
+}
+
 void
 libspectrum_microdrive_get_block( const libspectrum_microdrive *microdrive,
 				  libspectrum_byte which,

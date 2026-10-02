@@ -26,6 +26,7 @@
 
 #include <stdio.h>
 
+#include "internals.h"
 #include "libspectrum.h"
 #include "test.h"
 
@@ -454,4 +455,54 @@ identify_file_raw_unknown_buffer_returns_unknown( void )
   return check_identify_file_raw( "unknown data", random_data,
                                    sizeof( random_data ),
                                    NULL, LIBSPECTRUM_ID_UNKNOWN );
+}
+
+#ifdef HAVE_ZLIB_H
+
+static const libspectrum_byte gzip_100_as[] = {
+  0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x02, 0xff, 0x73, 0x74, 0xa4, 0x3d, 0x00, 0x00,
+  0x8d, 0xbc, 0x97, 0x95, 0x64, 0x00, 0x00, 0x00
+};
+
+#endif
+
+test_return_t
+identify_gzip_inflate_accepts_exact_limit( void )
+{
+#ifdef HAVE_ZLIB_H
+  libspectrum_byte *output = NULL;
+  size_t length = 0;
+  libspectrum_error error;
+
+  error = libspectrum_gzip_inflate( gzip_100_as, sizeof( gzip_100_as ),
+                                    &output, &length, 100 );
+  if( error || length != 100 ) {
+    libspectrum_free( output );
+    return TEST_FAIL;
+  }
+
+  libspectrum_free( output );
+#endif
+
+  return TEST_PASS;
+}
+
+test_return_t
+identify_gzip_inflate_rejects_output_over_limit( void )
+{
+#ifdef HAVE_ZLIB_H
+  libspectrum_byte *output = NULL;
+  size_t length = 0;
+  libspectrum_error error;
+
+  error = libspectrum_gzip_inflate( gzip_100_as, sizeof( gzip_100_as ),
+                                    &output, &length, 99 );
+  if( error != LIBSPECTRUM_ERROR_LIMIT || output || length ) {
+    libspectrum_free( output );
+    return TEST_FAIL;
+  }
+#endif
+
+  return TEST_PASS;
 }

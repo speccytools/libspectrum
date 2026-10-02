@@ -150,6 +150,57 @@ done:
 }
 
 test_return_t
+microdrive_structured_block_accessors( void )
+{
+  libspectrum_microdrive *mdr = libspectrum_microdrive_alloc();
+  const libspectrum_byte *name, *data;
+  size_t i;
+  test_return_t r = TEST_FAIL;
+  const libspectrum_byte block[] = {
+    1, 7, 0x34, 0x12, 'C', 'A', 'R', 'T', 'R', 'I', 'D', 'G', 'E', ' ', 0xa1,
+    6, 2, 0x78, 0x56, 'R', 'E', 'C', 'O', 'R', 'D', ' ', ' ', ' ', ' ', 0xb2
+  };
+
+  if( !mdr ) return TEST_INCOMPLETE;
+
+  libspectrum_microdrive_set_cartridge_len( mdr, 1 );
+  for( i = 0; i < sizeof( block ); i++ )
+    libspectrum_microdrive_set_data( mdr, i, block[i] );
+  libspectrum_microdrive_set_data( mdr, 30, 0xc3 );
+  libspectrum_microdrive_set_data( mdr,
+                                   LIBSPECTRUM_MICRODRIVE_BLOCK_LEN - 1, 0xd4 );
+
+  name = libspectrum_microdrive_block_cartridge_name( mdr, 0 );
+  data = libspectrum_microdrive_block_data( mdr, 0 );
+  if( libspectrum_microdrive_block_count( mdr ) != 1 ||
+      libspectrum_microdrive_block_header_flag( mdr, 0 ) != 1 ||
+      libspectrum_microdrive_block_number( mdr, 0 ) != 7 ||
+      libspectrum_microdrive_block_header_unused( mdr, 0 ) != 0x1234 ||
+      !name || name[0] != 'C' || name[9] != ' ' ||
+      libspectrum_microdrive_block_header_checksum( mdr, 0 ) != 0xa1 ||
+      libspectrum_microdrive_block_record_flags( mdr, 0 ) != 6 ||
+      libspectrum_microdrive_block_record_number( mdr, 0 ) != 2 ||
+      libspectrum_microdrive_block_record_length( mdr, 0 ) != 0x5678 ||
+      !( name = libspectrum_microdrive_block_record_name( mdr, 0 ) ) ||
+      name[0] != 'R' || name[9] != ' ' ||
+      libspectrum_microdrive_block_record_checksum( mdr, 0 ) != 0xb2 ||
+      !data || data[0] != 0xc3 ||
+      libspectrum_microdrive_block_data_checksum( mdr, 0 ) != 0xd4 )
+    goto done;
+
+  if( libspectrum_microdrive_block_cartridge_name( mdr, 1 ) != NULL ||
+      libspectrum_microdrive_block_record_name( mdr, 1 ) != NULL ||
+      libspectrum_microdrive_block_data( mdr, 1 ) != NULL )
+    goto done;
+
+  r = TEST_PASS;
+
+done:
+  libspectrum_microdrive_free( mdr );
+  return r;
+}
+
+test_return_t
 microdrive_mdr_write_mdr_read_roundtrip( void )
 {
   /* libspectrum_microdrive: mdr_write/mdr_read roundtrip */

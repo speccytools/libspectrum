@@ -1,3 +1,38 @@
+2026-09-20  Fredrick Meunier  <fredm@spamcop.net>
+
+        * libspectrum 1.7.0 released.
+
+        * Make tape playback own signal polarity and return absolute levels for
+          live and cursor playback, with atomic cursor state operations
+          (Fredrick Meunier).
+
+        * Add a resolved-file abstraction for accessing compressed and
+          uncompressed files (part of bugs #507 and #192) (Fredrick Meunier,
+          thanks Gergely Szasz and Bernat).
+
+        * Add RZX playback input cursor and creator metadata APIs (Fredrick
+          Meunier).
+
+        * Add structured accessors for microdrive block headers, record
+          descriptors, data and checksums (Fredrick Meunier).
+
+        * Require C11 or later (Fredrick Meunier).
+
+        * Limit expanded compressed files to 64 MiB (part of bug #168)
+          (Fredrick Meunier, thanks Gergely Szasz).
+
+        * Various minor bug fixes/improvements:
+          * Preserve pulse polarity when converting PZX tapes to TZX (Fredrick
+            Meunier).
+          * Skip empty RZX input blocks during playback (fixes bug #527)
+            (Fredrick Meunier, thanks Sergio Baldoví).
+          * Detect 8K Interface 1 ROMs in Z80 snapshots (Fredrick Meunier).
+          * Handle legacy Spectaculator Scorpion Z80 pages (Fredrick Meunier).
+          * Remove the beeper capability from Timex machines (Fredrick
+            Meunier).
+          * Use guaranteed lock-free atomic flag operations in fake Glib
+            (Fredrick Meunier).
+
 2026-08-23  Fredrick Meunier  <fredm@spamcop.net>
 
         * libspectrum 1.6.4 released.

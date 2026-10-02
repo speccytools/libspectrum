@@ -63,6 +63,8 @@ tzx_write_stop( libspectrum_buffer* buffer );
 static void
 add_set_signal_level_block( libspectrum_buffer* buffer, int level );
 static void
+add_initial_pulse_level_block( libspectrum_buffer* buffer, int level );
+static void
 tzx_write_set_signal_level( libspectrum_tape_block *block, libspectrum_buffer* buffer );
 static void
 tzx_write_comment( libspectrum_tape_block *block, libspectrum_buffer* buffer );
@@ -474,7 +476,7 @@ tzx_write_pause( libspectrum_tape_block *block, libspectrum_buffer *buffer )
      pause is a pulse too */
   if( libspectrum_tape_block_level( block ) != 0 ) {
     if( libspectrum_tape_block_level( block ) == 1 ) {
-      add_set_signal_level_block( buffer, 1 );
+      add_initial_pulse_level_block( buffer, 1 );
     }
 
     add_pure_tone_block( buffer,
@@ -550,6 +552,15 @@ add_set_signal_level_block( libspectrum_buffer *buffer, int level )
   libspectrum_buffer_write_byte( buffer, LIBSPECTRUM_TAPE_BLOCK_SET_SIGNAL_LEVEL );
   libspectrum_buffer_write_dword( buffer, 1 );
   libspectrum_buffer_write_byte( buffer, level );
+}
+
+/* TZX pulse-producing blocks start by making an edge from the current signal
+   level.  PZX-style blocks instead store the level of their first pulse, so
+   set the TZX current level to its opposite before serialising one. */
+static void
+add_initial_pulse_level_block( libspectrum_buffer *buffer, int level )
+{
+  add_set_signal_level_block( buffer, !level );
 }
 
 static void
@@ -788,7 +799,7 @@ tzx_write_pulse_sequence( libspectrum_tape_block *block, libspectrum_buffer *buf
   size_t max_pulse_count = 0;
   libspectrum_dword *lengths = NULL;
 
-  add_set_signal_level_block( buffer, 0 );
+  add_initial_pulse_level_block( buffer, 0 );
 
   for( i = 0; i<count; i++ ) {
     size_t pulse_repeats = libspectrum_tape_block_pulse_repeats( block, i );
@@ -842,7 +853,9 @@ tzx_write_data_block( libspectrum_tape_block *block, libspectrum_buffer *buffer 
   libspectrum_byte *data;
   libspectrum_tape_generalised_data_symbol_table pilot_table, data_table;
 
-  tzx_write_set_signal_level( block, buffer );
+  add_initial_pulse_level_block(
+    buffer, libspectrum_tape_block_level( block )
+  );
 
   /* Pure data block can only have two identical pulses for bit 0 and bit 1 */
   if( libspectrum_tape_block_bit0_pulse_count( block ) != 2 ||

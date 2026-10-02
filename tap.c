@@ -51,6 +51,7 @@ internal_tap_read( libspectrum_tape *tape, const libspectrum_byte *buffer,
 		   const size_t length, libspectrum_id_t type )
 {
   libspectrum_tape_block *block;
+  libspectrum_error error;
   size_t data_length, buf_length; libspectrum_byte *data;
 
   const libspectrum_byte *ptr, *end;
@@ -124,7 +125,12 @@ internal_tap_read( libspectrum_tape *tape, const libspectrum_byte *buffer,
     /* Give a 1s pause after each block */
     libspectrum_set_pause_ms( block, 1000 );
 
-    libspectrum_tape_append_block( tape, block );
+    error = libspectrum_tape_append_block( tape, block );
+    if( error ) {
+      libspectrum_tape_block_free( block );
+      libspectrum_tape_clear( tape );
+      return error;
+    }
   }
 
   return LIBSPECTRUM_ERROR_NONE;

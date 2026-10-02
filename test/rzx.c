@@ -1150,6 +1150,224 @@ done:
   return r;
 }
 
+test_return_t
+rzx_playback_skips_empty_input_blocks( void )
+{
+  libspectrum_rzx *rzx = libspectrum_rzx_alloc();
+  libspectrum_snap *snap = NULL;
+  int finished = 0;
+  test_return_t r = TEST_FAIL;
+
+  if( !rzx ) return TEST_INCOMPLETE;
+
+  /* Empty input blocks may occur at the start, between recorded frames, or
+     at the end of an RZX file. */
+  libspectrum_rzx_start_input( rzx, 0 );
+  libspectrum_rzx_stop_input( rzx );
+
+  libspectrum_rzx_start_input( rzx, 0 );
+  if( libspectrum_rzx_store_frame( rzx, 10, 0, NULL ) ) goto done;
+  libspectrum_rzx_stop_input( rzx );
+
+  libspectrum_rzx_start_input( rzx, 0 );
+  libspectrum_rzx_stop_input( rzx );
+
+  libspectrum_rzx_start_input( rzx, 0 );
+  if( libspectrum_rzx_store_frame( rzx, 20, 0, NULL ) ) goto done;
+  libspectrum_rzx_stop_input( rzx );
+
+  libspectrum_rzx_start_input( rzx, 0 );
+  libspectrum_rzx_stop_input( rzx );
+
+  if( libspectrum_rzx_start_playback( rzx, 0, &snap ) ||
+      libspectrum_rzx_instructions( rzx ) != 10 ) {
+    fprintf( stderr, "%s: failed to skip initial empty input block\n",
+             progname );
+    goto done;
+  }
+
+  if( libspectrum_rzx_playback_frame( rzx, &finished, &snap ) || finished ||
+      libspectrum_rzx_instructions( rzx ) != 20 ) {
+    fprintf( stderr, "%s: failed to skip intermediate empty input block\n",
+             progname );
+    goto done;
+  }
+
+  if( libspectrum_rzx_playback_frame( rzx, &finished, &snap ) || !finished ) {
+    fprintf( stderr, "%s: failed to skip trailing empty input block\n",
+             progname );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+ done:
+  libspectrum_rzx_free( rzx );
+  return r;
+}
+
+test_return_t
+rzx_playback_input_cursor_management( void )
+{
+  libspectrum_rzx *rzx = libspectrum_rzx_alloc();
+  libspectrum_snap *snap = NULL;
+  libspectrum_byte in_bytes[3] = { 0x11, 0x22, 0x33 };
+  libspectrum_byte got;
+  int finished = 0;
+  test_return_t r = TEST_FAIL;
+
+  if( libspectrum_rzx_playback_inputs_remaining( rzx ) != 0 ||
+      libspectrum_rzx_playback_discard_inputs( rzx ) !=
+        LIBSPECTRUM_ERROR_INVALID ) {
+    fprintf( stderr, "%s: inactive playback cursor state is incorrect\n",
+             progname );
+    goto done;
+  }
+
+  libspectrum_rzx_start_input( rzx, 0 );
+  if( libspectrum_rzx_store_frame( rzx, 10, 3, in_bytes ) ||
+      libspectrum_rzx_store_frame( rzx, 20, 3, in_bytes ) ||
+      libspectrum_rzx_store_frame( rzx, 30, 0, NULL ) ) {
+    fprintf( stderr, "%s: failed to store playback cursor test frames\n",
+             progname );
+    goto done;
+  }
+  libspectrum_rzx_stop_input( rzx );
+
+  if( libspectrum_rzx_start_playback( rzx, 0, &snap ) ||
+      libspectrum_rzx_playback_inputs_remaining( rzx ) != 3 ) {
+    fprintf( stderr, "%s: initial remaining input count is incorrect\n",
+             progname );
+    goto done;
+  }
+
+  if( libspectrum_rzx_playback( rzx, &got ) || got != 0x11 ||
+      libspectrum_rzx_playback_inputs_remaining( rzx ) != 2 ) {
+    fprintf( stderr, "%s: remaining count after input is incorrect\n",
+             progname );
+    goto done;
+  }
+
+  if( libspectrum_rzx_playback_discard_inputs( rzx ) ||
+      libspectrum_rzx_playback_inputs_remaining( rzx ) != 0 ||
+      libspectrum_rzx_playback_frame( rzx, &finished, &snap ) || finished ) {
+    fprintf( stderr, "%s: failed to discard inputs and advance frame\n",
+             progname );
+    goto done;
+  }
+
+  /* The second frame repeats the first frame's effective input data. */
+  if( libspectrum_rzx_playback_inputs_remaining( rzx ) != 3 ||
+      libspectrum_rzx_playback_discard_inputs( rzx ) ||
+      libspectrum_rzx_playback_frame( rzx, &finished, &snap ) || finished ) {
+    fprintf( stderr, "%s: repeated frame cursor state is incorrect\n",
+             progname );
+    goto done;
+  }
+
+  if( libspectrum_rzx_playback_inputs_remaining( rzx ) != 0 ||
+      libspectrum_rzx_playback_discard_inputs( rzx ) ||
+      libspectrum_rzx_playback_frame( rzx, &finished, &snap ) || !finished ) {
+    fprintf( stderr, "%s: zero-input or final frame state is incorrect\n",
+             progname );
+    goto done;
+  }
+
+  if( libspectrum_rzx_playback_inputs_remaining( rzx ) != 0 ||
+      libspectrum_rzx_playback_discard_inputs( rzx ) !=
+        LIBSPECTRUM_ERROR_INVALID ) {
+    fprintf( stderr, "%s: finished playback cursor state is incorrect\n",
+             progname );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+ done:
+  libspectrum_rzx_free( rzx );
+  return r;
+}
+
+test_return_t
+rzx_read_retains_first_creator_block( void )
+{
+  static const libspectrum_byte buffer[] = {
+    'R', 'Z', 'X', '!', 0, 12, 0, 0, 0, 0,
+    0x10, 32, 0, 0, 0,
+    'F', 'i', 'r', 's', 't', 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    80, 0, 20, 12, 0x00, 0x42, 0xff,
+    0x10, 29, 0, 0, 0,
+    'S', 'e', 'c', 'o', 'n', 'd', 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 0, 2, 0
+  };
+  libspectrum_rzx *rzx = libspectrum_rzx_alloc();
+  const libspectrum_creator *creator;
+  test_return_t r = TEST_FAIL;
+
+  if( libspectrum_rzx_creator( rzx ) ) {
+    fprintf( stderr, "%s: new RZX unexpectedly has creator metadata\n",
+             progname );
+    goto done;
+  }
+
+  if( libspectrum_rzx_read( rzx, buffer, sizeof( buffer ) ) ) {
+    fprintf( stderr, "%s: failed to read RZX creator blocks\n", progname );
+    goto done;
+  }
+
+  creator = libspectrum_rzx_creator( rzx );
+  if( !creator || strcmp( libspectrum_creator_program( creator ), "First" ) ||
+      libspectrum_creator_major( creator ) != 80 ||
+      libspectrum_creator_minor( creator ) != 3092 ||
+      libspectrum_creator_custom_length( creator ) != 3 ||
+      memcmp( libspectrum_creator_custom( creator ), "\x00\x42\xff", 3 ) ) {
+    fprintf( stderr, "%s: retained RZX creator metadata is incorrect\n",
+             progname );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+ done:
+  libspectrum_rzx_free( rzx );
+  return r;
+}
+
+test_return_t
+rzx_read_rejects_short_creator_block( void )
+{
+  static const libspectrum_byte buffer[] = {
+    'R', 'Z', 'X', '!', 0, 12, 0, 0, 0, 0,
+    0x10, 28, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0
+  };
+  libspectrum_rzx *rzx = libspectrum_rzx_alloc();
+  libspectrum_error error;
+  test_return_t r = TEST_FAIL;
+
+  error = libspectrum_rzx_read( rzx, buffer, sizeof( buffer ) );
+  if( error != LIBSPECTRUM_ERROR_CORRUPT ) {
+    fprintf( stderr, "%s: short creator block returned %d, expected CORRUPT\n",
+             progname, error );
+    goto done;
+  }
+
+  if( libspectrum_rzx_creator( rzx ) ) {
+    fprintf( stderr, "%s: corrupt creator block was retained\n", progname );
+    goto done;
+  }
+
+  r = TEST_PASS;
+
+ done:
+  libspectrum_rzx_free( rzx );
+  return r;
+}
+
 /* rzx_playback_frame returns CORRUPT when IN count mismatches stored count */
 test_return_t
 rzx_playback_frame_returns_corrupt_on_in_count_mismatch( void )

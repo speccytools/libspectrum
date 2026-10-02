@@ -403,6 +403,80 @@ done:
   return r;
 }
 
+static test_return_t
+z80_interface1_rom_roundtrip( size_t rom_length )
+{
+  libspectrum_byte *buffer = NULL, *rom;
+  size_t output_length = 0, i;
+  libspectrum_snap *snap;
+  libspectrum_error error;
+  int flags = 0;
+  test_return_t r = TEST_FAIL;
+
+  snap = libspectrum_snap_alloc();
+  if( !snap ) return TEST_INCOMPLETE;
+
+  rom = libspectrum_new( libspectrum_byte, rom_length );
+  for( i = 0; i < rom_length; i++ ) rom[i] = ( i & 0xff ) + 1;
+
+  libspectrum_snap_set_machine( snap, LIBSPECTRUM_MACHINE_48 );
+  libspectrum_snap_set_pages( snap, 0,
+                              libspectrum_new0( libspectrum_byte, 0x4000 ) );
+  libspectrum_snap_set_pages( snap, 2,
+                              libspectrum_new0( libspectrum_byte, 0x4000 ) );
+  libspectrum_snap_set_pages( snap, 5,
+                              libspectrum_new0( libspectrum_byte, 0x4000 ) );
+  libspectrum_snap_set_interface1_active( snap, 1 );
+  libspectrum_snap_set_interface1_custom_rom( snap, 1 );
+  libspectrum_snap_set_interface1_rom( snap, 0, rom );
+  libspectrum_snap_set_interface1_rom_length( snap, 0, rom_length );
+
+  error = libspectrum_snap_write( &buffer, &output_length, &flags, snap,
+                                  LIBSPECTRUM_ID_SNAPSHOT_Z80, NULL, 0 );
+  libspectrum_snap_free( snap );
+  if( error != LIBSPECTRUM_ERROR_NONE ) return TEST_INCOMPLETE;
+
+  snap = libspectrum_snap_alloc();
+  if( !snap ) {
+    libspectrum_free( buffer );
+    return TEST_INCOMPLETE;
+  }
+
+  error = libspectrum_snap_read( snap, buffer, output_length,
+                                 LIBSPECTRUM_ID_SNAPSHOT_Z80, NULL );
+  libspectrum_free( buffer );
+  if( error != LIBSPECTRUM_ERROR_NONE ) {
+    libspectrum_snap_free( snap );
+    return TEST_INCOMPLETE;
+  }
+
+  if( libspectrum_snap_interface1_rom_length( snap, 0 ) == rom_length ) {
+    rom = libspectrum_snap_interface1_rom( snap, 0 );
+    for( i = 0; i < rom_length; i++ )
+      if( rom[i] != (libspectrum_byte)( ( i & 0xff ) + 1 ) ) break;
+    if( i == rom_length ) r = TEST_PASS;
+  }
+
+  if( r != TEST_PASS )
+    fprintf( stderr, "%s: %lu byte Interface 1 ROM did not survive Z80 roundtrip\n",
+             progname, (unsigned long)rom_length );
+
+  libspectrum_snap_free( snap );
+  return r;
+}
+
+test_return_t
+z80_interface1_8k_rom_roundtrip( void )
+{
+  return z80_interface1_rom_roundtrip( 0x2000 );
+}
+
+test_return_t
+z80_interface1_16k_rom_roundtrip( void )
+{
+  return z80_interface1_rom_roundtrip( 0x4000 );
+}
+
 test_return_t
 snap_late_timings_getter_setter( void )
 {

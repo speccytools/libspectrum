@@ -282,23 +282,20 @@ libspectrum_machine_capabilities( libspectrum_machine type )
   case LIBSPECTRUM_MACHINE_TC2048:
     return LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY   |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO    |
-           LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK |
-           LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER;
+           LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK;
 
   case LIBSPECTRUM_MACHINE_TC2068:
     return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY   |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO    |
-           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK     |
-           LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER;
+           LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK;
 
   case LIBSPECTRUM_MACHINE_TS2068:
     return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_MEMORY   |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO    |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_DOCK     |
-           LIBSPECTRUM_MACHINE_CAPABILITY_NTSC           |
-           LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER;
+           LIBSPECTRUM_MACHINE_CAPABILITY_NTSC;
 
   case LIBSPECTRUM_MACHINE_128:
     return LIBSPECTRUM_MACHINE_CAPABILITY_AY             |
@@ -360,8 +357,7 @@ libspectrum_machine_capabilities( libspectrum_machine type )
            LIBSPECTRUM_MACHINE_CAPABILITY_128_MEMORY        |
            LIBSPECTRUM_MACHINE_CAPABILITY_TIMEX_VIDEO       |
            LIBSPECTRUM_MACHINE_CAPABILITY_KEMPSTON_JOYSTICK |
-           LIBSPECTRUM_MACHINE_CAPABILITY_SE_MEMORY         |
-           LIBSPECTRUM_MACHINE_CAPABILITY_BEEPER;
+           LIBSPECTRUM_MACHINE_CAPABILITY_SE_MEMORY;
 
   }
 
@@ -727,7 +723,8 @@ libspectrum_uncompress_file( unsigned char **new_buffer, size_t *new_length,
     }
 
     error = libspectrum_bzip2_inflate( old_buffer, old_length,
-				       new_buffer, new_length );
+				       new_buffer, new_length,
+                                       LIBSPECTRUM_MAX_UNCOMPRESSED_FILE );
     if( error ) {
       if( new_filename ) libspectrum_free( *new_filename );
       return error;
@@ -758,7 +755,8 @@ libspectrum_uncompress_file( unsigned char **new_buffer, size_t *new_length,
     }
       
     error = libspectrum_gzip_inflate( old_buffer, old_length,
-				      new_buffer, new_length );
+				      new_buffer, new_length,
+                                      LIBSPECTRUM_MAX_UNCOMPRESSED_FILE );
     if( error ) {
       if( new_filename ) libspectrum_free( *new_filename );
       return error;
@@ -785,8 +783,10 @@ libspectrum_uncompress_file( unsigned char **new_buffer, size_t *new_length,
       (*new_filename)[ strlen( *new_filename ) - 4 ] = '\0';
     }
 
-    error = libspectrum_zip_blind_read( old_buffer, old_length,
-                                        new_buffer, new_length );
+    error = libspectrum_zip_blind_read(
+      old_buffer, old_length, new_buffer, new_length,
+      LIBSPECTRUM_MAX_UNCOMPRESSED_FILE
+    );
     if( error ) {
       if( new_filename ) libspectrum_free( *new_filename );
       return error;

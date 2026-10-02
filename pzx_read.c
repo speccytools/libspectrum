@@ -216,7 +216,8 @@ read_pzxt_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
     libspectrum_tape_block_set_ids( block, ids );
     libspectrum_tape_block_set_texts( block, strings );
 
-    libspectrum_tape_append_block( tape, block );
+    error = libspectrum_tape_append_block( tape, block );
+    if( error ) return error;
   }
 
   return LIBSPECTRUM_ERROR_NONE;
@@ -305,9 +306,7 @@ read_data_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
   libspectrum_tape_block_set_bits_in_last_byte( block, bits_in_last_byte );
   libspectrum_tape_block_set_data( block, data );
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -397,10 +396,8 @@ read_puls_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
   libspectrum_tape_block_set_pulse_lengths( block, lengths_buffer );
   libspectrum_tape_block_set_pulse_repeats( block, pulse_repeats_buffer );
 
-  libspectrum_tape_append_block( tape, block );
-
   /* And return */
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -413,7 +410,7 @@ read_paus_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
   int initial_level;
 
   /* Check the pause actually exists */
-  if( data_length < 2 ) {
+  if( data_length < 4 ) {
     libspectrum_print_error( LIBSPECTRUM_ERROR_CORRUPT,
 			     "read_paus_block: not enough data in buffer" );
     return LIBSPECTRUM_ERROR_CORRUPT;
@@ -429,10 +426,8 @@ read_paus_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
   libspectrum_set_pause_tstates( block, pause_tstates );
   libspectrum_tape_block_set_level( block, initial_level );
 
-  libspectrum_tape_append_block( tape, block );
-
   /* And return */
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -451,9 +446,7 @@ read_brws_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
   if( error ) { libspectrum_free( block ); return error; }
   libspectrum_tape_block_set_text( block, text );
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
@@ -480,9 +473,7 @@ read_stop_block( libspectrum_tape *tape, const libspectrum_byte **buffer,
     libspectrum_tape_block_set_pause( block, 0 );
   }
 
-  libspectrum_tape_append_block( tape, block );
-
-  return LIBSPECTRUM_ERROR_NONE;
+  return libspectrum_tape_append_block( tape, block );
 }
 
 static libspectrum_error
