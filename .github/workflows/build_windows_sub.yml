@@ -97,7 +97,7 @@ jobs:
             cygwin-packages-libspectrum-
 
       - name: (4) Install Cygwin (32 bit) with libs
-        uses: cygwin/cygwin-install-action@v6
+        uses: cygwin/cygwin-install-action@v7
         with:
           platform: x86
           packages: |
